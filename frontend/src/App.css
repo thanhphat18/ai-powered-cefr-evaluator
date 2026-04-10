@@ -473,7 +473,13 @@ h1 {
 }
 
 .dashboard-page {
-  width: min(100%, 700px);
+  width: min(100%, 1100px);
+}
+
+.dashboard-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }
 
 .profile-page {
@@ -486,7 +492,271 @@ h1 {
 .dashboard-card {
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: 1rem;
+  text-align: left;
+}
+
+.dashboard-hero-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.9fr);
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.dashboard-hero-copy,
+.dashboard-action-panel,
+.dashboard-section-head,
+.dashboard-checklist,
+.dashboard-stat-grid,
+.dashboard-skill-row,
+.dashboard-history-list {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-pill-row,
+.dashboard-action-row,
+.dashboard-skill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.dashboard-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.4rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(249, 247, 255, 0.86);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.dashboard-action-panel,
+.dashboard-stat,
+.dashboard-check-item,
+.dashboard-history-item,
+.dashboard-empty-state {
+  padding: 1.1rem 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dashboard-panel-label,
+.dashboard-stat-label,
+.dashboard-history-date {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dashboard-panel-copy,
+.dashboard-section-copy,
+.dashboard-stat-copy,
+.dashboard-history-summary,
+.dashboard-empty-state p {
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+.dashboard-primary-button,
+.dashboard-secondary-button {
+  position: relative;
+  z-index: 1;
+  min-height: 3rem;
+  border-radius: 1rem;
+  padding: 0.95rem 1.15rem;
+  font-size: 0.96rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    background-color 0.25s ease,
+    filter 0.25s ease;
+}
+
+.dashboard-primary-button {
+  border: none;
+  color: #1c1637;
+  background: linear-gradient(120deg, var(--accent-pink) 0%, var(--accent-cyan) 54%, var(--accent-gold) 100%);
+  box-shadow: 0 18px 36px rgba(23, 17, 58, 0.32);
+}
+
+.dashboard-primary-button:hover:not(:disabled),
+.dashboard-secondary-button:hover {
+  transform: translateY(-2px);
+}
+
+.dashboard-primary-button:hover:not(:disabled) {
+  box-shadow: 0 24px 40px rgba(26, 20, 62, 0.38);
+}
+
+.dashboard-primary-button:disabled {
+  cursor: not-allowed;
+  filter: saturate(0.82);
+  opacity: 0.72;
+}
+
+.dashboard-secondary-button {
+  border: 1px solid rgba(154, 232, 255, 0.22);
+  background: rgba(154, 232, 255, 0.1);
+  color: var(--accent-cyan);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.dashboard-secondary-button:hover {
+  background: rgba(154, 232, 255, 0.18);
+  box-shadow: 0 14px 28px rgba(6, 8, 24, 0.22);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  gap: 1.25rem;
+}
+
+.dashboard-coach-card {
+  gap: 1.2rem;
+}
+
+.dashboard-stats-card,
+.dashboard-focus-card {
+  gap: 1rem;
+}
+
+.dashboard-history-card {
+  gap: 1.2rem;
+  grid-column: 1 / -1;
+}
+
+.dashboard-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.dashboard-status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(255, 173, 216, 0.14);
+  color: var(--accent-gold);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dashboard-checklist,
+.dashboard-history-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.dashboard-check-item {
+  position: relative;
+  margin: 0;
+  padding-left: 3rem;
+  color: #ffffff;
+  line-height: 1.7;
+}
+
+.dashboard-check-item::before {
+  content: "";
+  position: absolute;
+  left: 1.2rem;
+  top: 1.15rem;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--accent-pink), var(--accent-cyan));
+  box-shadow: 0 0 0 4px rgba(154, 232, 255, 0.12);
+}
+
+.dashboard-stat-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.dashboard-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.dashboard-stat-value {
+  color: #ffffff;
+  font-family: "Orbitron", "Outfit", sans-serif;
+  font-size: clamp(1.65rem, 4vw, 2.4rem);
+  letter-spacing: 0.04em;
+}
+
+.dashboard-skill-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.3rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(249, 247, 255, 0.84);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.dashboard-skill-chip.is-active {
+  border-color: rgba(255, 226, 158, 0.4);
+  background: rgba(255, 226, 158, 0.12);
+  color: var(--accent-gold);
+}
+
+.dashboard-history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dashboard-history-head h2,
+.dashboard-empty-state h2 {
+  margin: 0;
+  color: #ffffff;
+}
+
+.dashboard-history-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 5.75rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255, 173, 216, 0.12);
+  color: var(--accent-gold);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.dashboard-history-summary {
+  margin-top: 0.8rem;
+}
+
+.dashboard-empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
 .profile-grid {
@@ -771,11 +1041,6 @@ h1 {
   font-weight: 700;
 }
 
-.dashboard-card button {
-  align-self: flex-start;
-  min-width: 11rem;
-}
-
 @media (max-width: 820px) {
   #root {
     width: min(100%, calc(100% - 1rem));
@@ -796,6 +1061,11 @@ h1 {
 
   .profile-grid,
   .profile-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-hero-card,
+  .dashboard-grid {
     grid-template-columns: 1fr;
   }
 
@@ -835,9 +1105,15 @@ h1 {
     padding: 1.5rem;
   }
 
-  .dashboard-card button {
+  .dashboard-action-row,
+  .dashboard-primary-button,
+  .dashboard-secondary-button {
     width: 100%;
-    align-self: stretch;
+  }
+
+  .dashboard-history-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .profile-info-row,
