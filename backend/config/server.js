@@ -1,12 +1,44 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
+const cors = require("cors");
+const session = require("express-session");
+const { MongoStore } = require("connect-mongo");
+
+const authRoutes = require("../routes/auth");
 
 dotenv.config();
 
 const app = express();
+
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
+const SESSION_SECRET = process.env.SESSION_SECRET;
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+
+app.use(
+  cors({
+    origin: FRONTEND_URL,
+    credentials: true,
+  })
+);
+
+app.use(express.json());
+
+app.use(
+  session({
+    secret: SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: MONGO_URI,
+    }),
+    cookie: {
+      httpOnly: true,
+      maxAge: 1000 * 60 * 60 * 24,
+    },
+  })
+);
 
 app.get("/", (req, res) => {
   res.json({ message: "Backend is running" });
@@ -16,10 +48,16 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+app.use("/api/auth", authRoutes);
+
 async function startServer() {
   try {
     if (!MONGO_URI) {
       throw new Error("MONGO_URI is missing in .env");
+    }
+
+    if (!SESSION_SECRET) {
+      throw new Error("SESSION_SECRET is missing in .env");
     }
 
     await mongoose.connect(MONGO_URI);
