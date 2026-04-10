@@ -27,6 +27,9 @@ app.use(
 
 app.use(express.json());
 
+const isProduction = process.env.NODE_ENV === "production";
+
+
 app.use(
   session({
     secret: SESSION_SECRET,
@@ -37,6 +40,8 @@ app.use(
     }),
     cookie: {
       httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
       maxAge: 1000 * 60 * 60 * 24,
     },
   })

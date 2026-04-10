@@ -2,9 +2,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../context/AuthContext";
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { register } = useAuth();
 
   const {
     register: registerField,
@@ -13,6 +13,7 @@ export default function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
+      username: "",
       email: "",
       password: "",
     },
@@ -20,21 +21,36 @@ export default function LoginPage() {
 
   const onSubmit = async (data) => {
     try {
-      await login(data);
+      await register(data);
       navigate("/dashboard");
     } catch (err) {
       setError("root.serverError", {
         type: "server",
-        message: err.response?.data?.message || "Login failed",
+        message: err.response?.data?.message || "Registration failed",
       });
     }
   };
 
   return (
     <main style={{ padding: "2rem", fontFamily: "sans-serif" }}>
-      <h1>Login</h1>
+      <h1>Register</h1>
 
       <form onSubmit={handleSubmit(onSubmit)}>
+        <div>
+          <input
+            type="text"
+            placeholder="Username"
+            {...registerField("username", {
+              required: "Username is required",
+              minLength: {
+                value: 3,
+                message: "Username must be at least 3 characters",
+              },
+            })}
+          />
+          {errors.username ? <p>{errors.username.message}</p> : null}
+        </div>
+
         <div>
           <input
             type="email"
@@ -52,20 +68,25 @@ export default function LoginPage() {
             placeholder="Password"
             {...registerField("password", {
               required: "Password is required",
+              minLength: {
+                value: 6,
+                message: "Password must be at least 6 characters",
+              },
             })}
           />
           {errors.password ? <p>{errors.password.message}</p> : null}
         </div>
 
         <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Logging in..." : "Login"}
+          {isSubmitting ? "Creating account..." : "Register"}
         </button>
       </form>
-      <p>
-        Don't have an account? <Link to="/register">Register</Link>
-      </p>
 
       {errors.root?.serverError ? <p>{errors.root.serverError.message}</p> : null}
+
+      <p>
+        Already have an account? <Link to="/login">Login</Link>
+      </p>
     </main>
   );
 }

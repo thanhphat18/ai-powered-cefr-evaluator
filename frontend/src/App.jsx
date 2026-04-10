@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+
 
 export default function App() {
   return (
@@ -15,6 +17,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route path="/register" element={<RegisterPage />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
