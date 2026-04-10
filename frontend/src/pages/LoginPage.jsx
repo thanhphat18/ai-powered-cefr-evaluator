@@ -31,41 +31,59 @@ export default function LoginPage() {
   };
 
   return (
-    <main style={{ padding: "2rem", fontFamily: "sans-serif" }}>
-      <h1>Login</h1>
+    <main className="auth-page">
+      <section className="auth-card">
+        <p className="eyebrow">Secure Access</p>
+        <h1>Login</h1>
+        <p className="auth-subtitle">
+          Step into your CEFR evaluation workspace and continue exactly where you
+          left off.
+        </p>
 
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <div>
-          <input
-            type="email"
-            placeholder="Email"
-            {...registerField("email", {
-              required: "Email is required",
-            })}
-          />
-          {errors.email ? <p>{errors.email.message}</p> : null}
-        </div>
+        <form className="auth-form" onSubmit={handleSubmit(onSubmit)}>
+          <div className="form-field">
+            <label htmlFor="login-email">Email</label>
+            <input
+              id="login-email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              {...registerField("email", {
+                required: "Email is required",
+              })}
+            />
+            {errors.email ? <p className="form-error">{errors.email.message}</p> : null}
+          </div>
 
-        <div>
-          <input
-            type="password"
-            placeholder="Password"
-            {...registerField("password", {
-              required: "Password is required",
-            })}
-          />
-          {errors.password ? <p>{errors.password.message}</p> : null}
-        </div>
+          <div className="form-field">
+            <label htmlFor="login-password">Password</label>
+            <input
+              id="login-password"
+              type="password"
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              {...registerField("password", {
+                required: "Password is required",
+              })}
+            />
+            {errors.password ? <p className="form-error">{errors.password.message}</p> : null}
+          </div>
 
-        <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Logging in..." : "Login"}
-        </button>
-      </form>
-      <p>
-        Don't have an account? <Link to="/register">Register</Link>
-      </p>
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Logging in..." : "Login"}
+          </button>
+        </form>
 
-      {errors.root?.serverError ? <p>{errors.root.serverError.message}</p> : null}
+        {errors.root?.serverError ? (
+          <p className="auth-alert" role="alert">
+            {errors.root.serverError.message}
+          </p>
+        ) : null}
+
+        <p className="auth-switch">
+          Don't have an account? <Link to="/register">Register</Link>
+        </p>
+      </section>
     </main>
   );
 }

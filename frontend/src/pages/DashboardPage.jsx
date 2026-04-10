@@ -11,10 +11,19 @@ export default function DashboardPage() {
   };
 
   return (
-    <main style={{ padding: "2rem", fontFamily: "sans-serif" }}>
-      <h1>Dashboard</h1>
-      <p>Welcome, {user?.username || user?.email}</p>
-      <button onClick={handleLogout}>Logout</button>
+    <main className="dashboard-page">
+      <section className="dashboard-card">
+        <p className="eyebrow">Mission Control</p>
+        <h1>Dashboard</h1>
+        <p className="dashboard-copy">
+          Welcome back,{" "}
+          <span className="welcome-name">{user?.username || user?.email}</span>.
+          Your CEFR workspace is ready for the next session.
+        </p>
+        <button type="button" onClick={handleLogout}>
+          Logout
+        </button>
+      </section>
     </main>
   );
 }
