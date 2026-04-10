@@ -1,0 +1,48 @@
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/useAuth";
+
+export default function Navbar(){
+    const navigate = useNavigate();
+    const { user, loading, logout } = useAuth();
+
+    const handleLogout = async () => {
+        await logout();
+        navigate("/login");
+    };
+
+    return(
+        <nav className="navbar">
+            <div className="navbar-container">
+                <Link to="/dashboard" className="navbar-brand">
+                    ETest
+                </Link>
+                <div>
+                    <Link to="/dashboard" className="navbar-link">
+                        Home
+                    </Link>
+                </div>
+            </div>
+            <div className="navbar-auth">
+                {loading ? null : user ? (
+                    <>
+                        <span className="navbar-user" title={user.email}>
+                            {user.username || user.email}
+                        </span>
+                        <button type="button" className="navbar-logout" onClick={handleLogout}>
+                            Log Out
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <Link to="/login" className="navbar-link">
+                            Log In
+                        </Link>
+                        <Link to="/register" className="navbar-link navbar-link-accent">
+                            Register
+                        </Link>
+                    </>
+                )}
+            </div>
+        </nav>
+    );
+}
