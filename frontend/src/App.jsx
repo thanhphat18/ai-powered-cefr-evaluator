@@ -1,24 +1,21 @@
-import { useState } from "react";
-import { authApi } from "./lib/api";
+import { Navigate, Route, Routes } from "react-router-dom";
+import ProtectedRoute from "./components/ProtectedRoute";
+import DashboardPage from "./pages/DashboardPage";
+import LoginPage from "./pages/LoginPage";
 
 export default function App() {
-  const [message, setMessage] = useState("No request yet");
-
-  const checkMe = async () => {
-    try {
-      const response = await authApi.me();
-      setMessage(`Logged in as ${response.data.user.email}`);
-    } catch (error) {
-      setMessage(error.response?.data?.message || "Request failed");
-    }
-  };
-
   return (
-    <main style={{ padding: "2rem", fontFamily: "sans-serif" }}>
-      <h1>Frontend Session Test</h1>
-      <p>This page tests whether the frontend can reach the backend.</p>
-      <button onClick={checkMe}>Check Current User</button>
-      <p>{message}</p>
-    </main>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
   );
 }
