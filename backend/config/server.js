@@ -4,6 +4,8 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const session = require("express-session");
 const { MongoStore } = require("connect-mongo");
+const protectedRoutes = require("../routes/protected");
+
 
 const authRoutes = require("../routes/auth");
 
@@ -49,6 +51,8 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/protected", protectedRoutes);
+
 
 async function startServer() {
   try {
