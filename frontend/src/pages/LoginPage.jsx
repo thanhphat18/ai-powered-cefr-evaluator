@@ -1,10 +1,12 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../context/useAuth";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+  const successMessage = location.state?.successMessage;
 
   const {
     register: registerField,
@@ -69,10 +71,20 @@ export default function LoginPage() {
             {errors.password ? <p className="form-error">{errors.password.message}</p> : null}
           </div>
 
+          <p className="auth-helper">
+            <Link to="/forgot-password">Forgot your password?</Link>
+          </p>
+
           <button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Logging in..." : "Login"}
           </button>
         </form>
+
+        {successMessage ? (
+          <p className="auth-info" role="status">
+            {successMessage}
+          </p>
+        ) : null}
 
         {errors.root?.serverError ? (
           <p className="auth-alert" role="alert">

@@ -389,6 +389,49 @@ h1 {
   line-height: 1.6;
 }
 
+.auth-helper {
+  position: relative;
+  z-index: 1;
+  margin: -0.4rem 0 0;
+  text-align: right;
+}
+
+.auth-helper a {
+  color: var(--accent-cyan);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-helper a:hover {
+  color: var(--accent-gold);
+}
+
+.auth-info {
+  position: relative;
+  z-index: 1;
+  margin: 1rem 0 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(154, 232, 255, 0.28);
+  border-radius: 1rem;
+  background: rgba(154, 232, 255, 0.12);
+  color: #ffffff;
+  line-height: 1.6;
+}
+
+.auth-info p {
+  margin: 0;
+}
+
+.auth-info p + p {
+  margin-top: 0.7rem;
+}
+
+.auth-info a {
+  color: var(--accent-gold);
+  font-weight: 700;
+  word-break: break-word;
+}
+
 .auth-switch a {
   color: var(--accent-cyan);
   font-weight: 700;
