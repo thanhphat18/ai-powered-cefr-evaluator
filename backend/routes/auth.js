@@ -66,6 +66,10 @@ function isConfiguredAdminEmail(email) {
   return ADMIN_EMAILS.includes((email || "").trim().toLowerCase());
 }
 
+function normalizeEmail(email) {
+  return (email || "").trim().toLowerCase();
+}
+
 async function determineRoleForNewUser(email) {
   const adminCount = await User.countDocuments({ role: "admin" });
 
@@ -111,6 +115,7 @@ function serializeUser(user) {
 router.post("/register", async (req, res) => {
   try {
     const { username, email, password } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
     if (!username || !email || !password) {
       return res.status(400).json({
@@ -118,7 +123,7 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    const existingUser = await User.findOne({ email: normalizedEmail });
 
     if (existingUser) {
       return res.status(409).json({
@@ -128,7 +133,7 @@ router.post("/register", async (req, res) => {
 
     const user = new User({
       username,
-      email,
+      email: normalizedEmail,
       role: await determineRoleForNewUser(email),
       password,
     });
@@ -152,6 +157,7 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
     if (!email || !password) {
       return res.status(400).json({
@@ -159,7 +165,7 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       return res.status(401).json({
@@ -201,7 +207,7 @@ router.post("/forgot-password", async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.toLowerCase();
+    const normalizedEmail = normalizeEmail(email);
     const user = await User.findOne({ email: normalizedEmail }).select(
       "+resetPasswordToken +resetPasswordExpiresAt"
     );
@@ -298,6 +304,53 @@ router.get("/me", requireAuth, async (req, res) => {
     console.error("Me error:", error);
     res.status(500).json({
       message: "Server error",
+    });
+  }
+});
+
+router.patch("/profile", requireAuth, async (req, res) => {
+  try {
+    const username = (req.body.username || "").trim();
+    const email = normalizeEmail(req.body.email);
+
+    if (!username || !email) {
+      return res.status(400).json({
+        message: "Name and email are required",
+      });
+    }
+
+    const user = await User.findById(req.session.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    const existingUser = await User.findOne({
+      email,
+      _id: { $ne: user._id },
+    }).select("_id");
+
+    if (existingUser) {
+      return res.status(409).json({
+        message: "That email is already in use",
+      });
+    }
+
+    user.username = username;
+    user.email = email;
+
+    await user.save();
+
+    res.status(200).json({
+      message: "Profile updated successfully",
+      user: serializeUser(user),
+    });
+  } catch (error) {
+    console.error("Profile update error:", error);
+    res.status(500).json({
+      message: "Unable to update profile",
     });
   }
 });

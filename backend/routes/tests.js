@@ -69,6 +69,30 @@ function toAdminQuestion(question) {
   };
 }
 
+function toAdminStudent(user) {
+  const testLibrary = user.summary?.testLibrary ?? [];
+  const latestResult = testLibrary[0] || null;
+
+  return {
+    id: String(user._id),
+    username: user.username,
+    email: user.email,
+    createdAt: user.createdAt,
+    testsTaken: user.summary?.testsTaken ?? 0,
+    highestScore: user.summary?.highestScore ?? 0,
+    storedSummaries: testLibrary.length,
+    latestResult: latestResult
+      ? {
+          id: String(latestResult._id),
+          title: latestResult.title,
+          score: latestResult.score ?? 0,
+          summary: latestResult.summary ?? "",
+          completedAt: latestResult.completedAt,
+        }
+      : null,
+  };
+}
+
 function sortQuestionsByIds(questions, orderedIds) {
   const questionMap = new Map(
     questions.map((question) => [String(question._id), question])
@@ -221,6 +245,23 @@ router.delete("/bank/:questionId", requireRole("admin"), async (req, res) => {
     console.error("Delete test bank question error:", error);
     res.status(500).json({
       message: "Unable to delete this question",
+    });
+  }
+});
+
+router.get("/admin/students", requireRole("admin"), async (req, res) => {
+  try {
+    const students = await User.find({ role: "student" })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.status(200).json({
+      students: students.map(toAdminStudent),
+    });
+  } catch (error) {
+    console.error("List students error:", error);
+    res.status(500).json({
+      message: "Unable to load students",
     });
   }
 });

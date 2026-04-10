@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
@@ -49,9 +49,266 @@ function readFileAsDataUrl(file) {
   });
 }
 
-export default function ProfilePage() {
+function AdminProfileContent({ user, refreshUser }) {
+  const [profileSuccessMessage, setProfileSuccessMessage] = useState("");
+  const [passwordSuccessMessage, setPasswordSuccessMessage] = useState("");
+
+  const {
+    register: registerProfileField,
+    handleSubmit: handleProfileSubmit,
+    reset: resetProfile,
+    setError: setProfileError,
+    clearErrors: clearProfileErrors,
+    formState: {
+      errors: profileErrors,
+      isSubmitting: isProfileSubmitting,
+    },
+  } = useForm({
+    defaultValues: {
+      username: user?.username || "",
+      email: user?.email || "",
+    },
+  });
+
+  const {
+    register: registerPasswordField,
+    getValues,
+    handleSubmit: handlePasswordSubmit,
+    reset: resetPassword,
+    setError: setPasswordError,
+    clearErrors: clearPasswordErrors,
+    formState: {
+      errors: passwordErrors,
+      isSubmitting: isPasswordSubmitting,
+    },
+  } = useForm({
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmNewPassword: "",
+    },
+  });
+
+  useEffect(() => {
+    resetProfile({
+      username: user?.username || "",
+      email: user?.email || "",
+    });
+  }, [resetProfile, user?.email, user?.username]);
+
+  const onSubmitProfile = async ({ username, email }) => {
+    setProfileSuccessMessage("");
+    clearProfileErrors();
+
+    try {
+      const response = await authApi.updateProfile({
+        username,
+        email,
+      });
+      const refreshedUser = await refreshUser();
+
+      resetProfile({
+        username: refreshedUser?.username || username,
+        email: refreshedUser?.email || email,
+      });
+      setProfileSuccessMessage(
+        response.data.message || "Profile updated successfully"
+      );
+    } catch (err) {
+      setProfileError("root.serverError", {
+        type: "server",
+        message: err.response?.data?.message || "Unable to update profile",
+      });
+    }
+  };
+
+  const onSubmitPassword = async ({ currentPassword, newPassword }) => {
+    setPasswordSuccessMessage("");
+    clearPasswordErrors();
+
+    try {
+      const response = await authApi.changePassword({
+        currentPassword,
+        newPassword,
+      });
+
+      await refreshUser();
+      resetPassword();
+      setPasswordSuccessMessage(
+        response.data.message || "Password updated successfully"
+      );
+    } catch (err) {
+      setPasswordError("root.serverError", {
+        type: "server",
+        message: err.response?.data?.message || "Unable to update password",
+      });
+    }
+  };
+
+  return (
+    <main className="profile-page">
+      <section className="profile-grid admin-profile-grid">
+        <article className="profile-card admin-profile-card">
+          <p className="eyebrow">Admin Profile</p>
+          <h1>Profile</h1>
+          <p className="profile-subtitle">
+            This admin profile is intentionally minimal. You can edit only your
+            name, email, and password here.
+          </p>
+
+          <form
+            className="auth-form admin-profile-form"
+            onSubmit={handleProfileSubmit(onSubmitProfile)}
+          >
+            <div className="form-field">
+              <label htmlFor="admin-profile-name">Name</label>
+              <input
+                id="admin-profile-name"
+                type="text"
+                autoComplete="name"
+                placeholder="Enter your name"
+                {...registerProfileField("username", {
+                  required: "Name is required",
+                  minLength: {
+                    value: 3,
+                    message: "Name must be at least 3 characters",
+                  },
+                })}
+              />
+              {profileErrors.username ? (
+                <p className="form-error">{profileErrors.username.message}</p>
+              ) : null}
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="admin-profile-email">Email</label>
+              <input
+                id="admin-profile-email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                {...registerProfileField("email", {
+                  required: "Email is required",
+                })}
+              />
+              {profileErrors.email ? (
+                <p className="form-error">{profileErrors.email.message}</p>
+              ) : null}
+            </div>
+
+            <button type="submit" disabled={isProfileSubmitting}>
+              {isProfileSubmitting ? "Saving profile..." : "Save profile"}
+            </button>
+          </form>
+
+          {profileSuccessMessage ? (
+            <p className="auth-info" role="status">
+              {profileSuccessMessage}
+            </p>
+          ) : null}
+
+          {profileErrors.root?.serverError ? (
+            <p className="auth-alert" role="alert">
+              {profileErrors.root.serverError.message}
+            </p>
+          ) : null}
+        </article>
+
+        <article className="profile-card admin-profile-card">
+          <p className="eyebrow">Security</p>
+          <h2 className="admin-profile-title">Change Password</h2>
+          <p className="profile-note">
+            Avatar changes and extra personal sections are hidden for admin
+            accounts, so this area only handles password updates.
+          </p>
+
+          <form
+            className="auth-form admin-profile-form"
+            onSubmit={handlePasswordSubmit(onSubmitPassword)}
+          >
+            <div className="form-field">
+              <label htmlFor="admin-current-password">Current Password</label>
+              <input
+                id="admin-current-password"
+                type="password"
+                autoComplete="current-password"
+                placeholder="Enter your current password"
+                {...registerPasswordField("currentPassword", {
+                  required: "Current password is required",
+                })}
+              />
+              {passwordErrors.currentPassword ? (
+                <p className="form-error">{passwordErrors.currentPassword.message}</p>
+              ) : null}
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="admin-new-password">New Password</label>
+              <input
+                id="admin-new-password"
+                type="password"
+                autoComplete="new-password"
+                placeholder="Choose a new password"
+                {...registerPasswordField("newPassword", {
+                  required: "New password is required",
+                  minLength: {
+                    value: 6,
+                    message: "New password must be at least 6 characters",
+                  },
+                  validate: (value) =>
+                    value !== getValues("currentPassword") ||
+                    "New password must be different from the current password",
+                })}
+              />
+              {passwordErrors.newPassword ? (
+                <p className="form-error">{passwordErrors.newPassword.message}</p>
+              ) : null}
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="admin-confirm-new-password">Confirm New Password</label>
+              <input
+                id="admin-confirm-new-password"
+                type="password"
+                autoComplete="new-password"
+                placeholder="Re-enter your new password"
+                {...registerPasswordField("confirmNewPassword", {
+                  required: "Please confirm your new password",
+                  validate: (value) =>
+                    value === getValues("newPassword") || "Passwords do not match",
+                })}
+              />
+              {passwordErrors.confirmNewPassword ? (
+                <p className="form-error">
+                  {passwordErrors.confirmNewPassword.message}
+                </p>
+              ) : null}
+            </div>
+
+            <button type="submit" disabled={isPasswordSubmitting}>
+              {isPasswordSubmitting ? "Updating password..." : "Save password"}
+            </button>
+          </form>
+
+          {passwordSuccessMessage ? (
+            <p className="auth-info" role="status">
+              {passwordSuccessMessage}
+            </p>
+          ) : null}
+
+          {passwordErrors.root?.serverError ? (
+            <p className="auth-alert" role="alert">
+              {passwordErrors.root.serverError.message}
+            </p>
+          ) : null}
+        </article>
+      </section>
+    </main>
+  );
+}
+
+function StudentProfileContent({ user, refreshUser }) {
   const location = useLocation();
-  const { user, refreshUser } = useAuth();
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [passwordSuccessMessage, setPasswordSuccessMessage] = useState("");
   const [avatarMessage, setAvatarMessage] = useState(
@@ -245,9 +502,8 @@ export default function ProfilePage() {
             <div className="profile-avatar-details">
               <h2>Profile Avatar</h2>
               <p className="profile-note">
-                Upload a PNG, JPG, or WEBP image from your computer. Maximum file size:
-                {" "}
-                {MAX_AVATAR_FILE_SIZE_LABEL}.
+                Upload a PNG, JPG, or WEBP image from your computer. Maximum file
+                size: {MAX_AVATAR_FILE_SIZE_LABEL}.
               </p>
 
               <div className="form-field profile-file-field">
@@ -429,8 +685,9 @@ export default function ProfilePage() {
           </div>
 
           <p className="profile-note">
-            These values are ready for the test module later, so each completed test can
-            update the user profile and leave a saved summary in the private library.
+            These values are ready for the test module later, so each completed
+            test can update the user profile and leave a saved summary in the
+            private library.
           </p>
         </article>
       </section>
@@ -458,12 +715,22 @@ export default function ProfilePage() {
           <div className="profile-empty-state">
             <h2>No test summaries stored yet</h2>
             <p>
-              After a user completes a test, this area can work like a private library
-              that keeps their result summary, score, and completion date.
+              After a user completes a test, this area can work like a private
+              library that keeps their result summary, score, and completion date.
             </p>
           </div>
         )}
       </section>
     </main>
   );
+}
+
+export default function ProfilePage() {
+  const { user, refreshUser } = useAuth();
+
+  if (user?.role === "admin") {
+    return <AdminProfileContent user={user} refreshUser={refreshUser} />;
+  }
+
+  return <StudentProfileContent user={user} refreshUser={refreshUser} />;
 }

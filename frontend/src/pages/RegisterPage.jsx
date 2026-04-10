@@ -25,7 +25,15 @@ export default function RegisterPage() {
     const { username, email, password } = data;
 
     try {
-      await register({ username, email, password });
+      const response = await register({ username, email, password });
+
+      if (response.data.user?.role === "admin") {
+        navigate("/dashboard", {
+          replace: true,
+        });
+        return;
+      }
+
       navigate("/profile", {
         replace: true,
         state: {

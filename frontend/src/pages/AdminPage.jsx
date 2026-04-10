@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/useAuth";
 import { testsApi } from "../lib/api";
 
 const EMPTY_FORM = {
@@ -13,6 +15,24 @@ const EMPTY_FORM = {
   explanation: "",
   isActive: true,
 };
+
+function formatCompletedAt(value) {
+  if (!value) {
+    return "No activity yet";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "No activity yet";
+  }
+
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 function questionToForm(question) {
   const options = Object.fromEntries(
@@ -59,7 +79,11 @@ function formatTypeLabel(type) {
 }
 
 export default function AdminPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [questions, setQuestions] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [studentSearch, setStudentSearch] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -70,37 +94,48 @@ export default function AdminPage() {
   useEffect(() => {
     let cancelled = false;
 
-    const loadBank = async () => {
-      try {
-        const response = await testsApi.getBank();
+    const loadAdminWorkspace = async () => {
+      const [bankResult, studentsResult] = await Promise.allSettled([
+        testsApi.getBank(),
+        testsApi.getStudents(),
+      ]);
 
-        if (cancelled) {
-          return;
-        }
-
-        setQuestions(response.data.questions);
-        setError("");
-      } catch (err) {
-        if (cancelled) {
-          return;
-        }
-
-        setError(err.response?.data?.message || "Unable to load the question bank");
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+      if (cancelled) {
+        return;
       }
+
+      const nextErrors = [];
+
+      if (bankResult.status === "fulfilled") {
+        setQuestions(bankResult.value.data.questions);
+      } else {
+        nextErrors.push(
+          bankResult.reason?.response?.data?.message ||
+            "Unable to load the question bank"
+        );
+      }
+
+      if (studentsResult.status === "fulfilled") {
+        setStudents(studentsResult.value.data.students);
+      } else {
+        nextErrors.push(
+          studentsResult.reason?.response?.data?.message ||
+            "Unable to load student records"
+        );
+      }
+
+      setError(nextErrors.join(" "));
+      setLoading(false);
     };
 
-    loadBank();
+    loadAdminWorkspace();
 
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const stats = useMemo(() => {
+  const questionStats = useMemo(() => {
     const activeCount = questions.filter((question) => question.isActive).length;
 
     return {
@@ -109,6 +144,41 @@ export default function AdminPage() {
       inactive: questions.length - activeCount,
     };
   }, [questions]);
+
+  const studentStats = useMemo(() => {
+    const activeStudents = students.filter((student) => student.testsTaken > 0).length;
+    const totalTestsTaken = students.reduce(
+      (sum, student) => sum + (student.testsTaken || 0),
+      0
+    );
+    const totalHighestScores = students.reduce(
+      (sum, student) => sum + (student.highestScore || 0),
+      0
+    );
+
+    return {
+      total: students.length,
+      active: activeStudents,
+      totalTestsTaken,
+      averageBestScore: students.length
+        ? Math.round(totalHighestScores / students.length)
+        : 0,
+    };
+  }, [students]);
+
+  const filteredStudents = useMemo(() => {
+    const normalizedSearch = studentSearch.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      return students;
+    }
+
+    return students.filter((student) =>
+      [student.username, student.email].some((value) =>
+        (value || "").toLowerCase().includes(normalizedSearch)
+      )
+    );
+  }, [studentSearch, students]);
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
@@ -132,14 +202,24 @@ export default function AdminPage() {
   };
 
   const handleDelete = async (questionId) => {
+    const confirmed = window.confirm(
+      "Delete this question from the test bank?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     try {
       await testsApi.deleteQuestion(questionId);
       setQuestions((current) =>
         current.filter((question) => question.id !== questionId)
       );
+
       if (editingId === questionId) {
         resetForm();
       }
+
       setMessage("Question deleted successfully.");
       setError("");
     } catch (err) {
@@ -190,26 +270,228 @@ export default function AdminPage() {
   return (
     <main className="admin-page">
       <section className="admin-layout">
+        <section className="dashboard-card dashboard-hero-card">
+          <div className="dashboard-hero-copy">
+            <p className="eyebrow">Admin Workspace</p>
+            <h1>Dashboard</h1>
+            <p className="dashboard-copy">
+              Welcome back,{" "}
+              <span className="welcome-name">{user?.username || user?.email}</span>.
+              This dashboard now keeps the admin flow focused on three jobs:
+              reviewing the overall platform summary, managing students, and
+              maintaining the CEFR test bank.
+            </p>
+
+            <div className="dashboard-pill-row">
+              <span className="dashboard-pill">Manage test bank</span>
+              <span className="dashboard-pill">Manage students</span>
+              <span className="dashboard-pill">Overall summary</span>
+            </div>
+          </div>
+
+          <div className="dashboard-action-panel">
+            <p className="dashboard-panel-label">Quick actions</p>
+            <p className="dashboard-panel-copy">
+              Jump straight into the simplified admin profile or preview the
+              student-facing test flow from the same account.
+            </p>
+
+            <div className="dashboard-action-row">
+              <button
+                type="button"
+                className="dashboard-primary-button"
+                onClick={() => navigate("/profile")}
+              >
+                Open Profile
+              </button>
+              <button
+                type="button"
+                className="dashboard-secondary-button"
+                onClick={() => navigate("/test")}
+              >
+                Preview Test
+              </button>
+            </div>
+          </div>
+        </section>
+
         <article className="dashboard-card admin-panel">
-          <p className="eyebrow">Admin Dashboard</p>
-          <h1>Question Bank</h1>
-          <p className="dashboard-copy">
-            This first admin version focuses on manual CRUD so you can create,
-            edit, activate, and remove test items step by step.
+          <div className="dashboard-section-head">
+            <p className="eyebrow">Overall Summary</p>
+          </div>
+
+          <div className="dashboard-stat-grid admin-summary-grid">
+            <div className="dashboard-stat">
+              <span className="dashboard-stat-label">Question Bank</span>
+              <strong className="dashboard-stat-value">{questionStats.total}</strong>
+              <p className="dashboard-stat-copy">
+                Total questions available in the bank.
+              </p>
+            </div>
+            <div className="dashboard-stat">
+              <span className="dashboard-stat-label">Active Questions</span>
+              <strong className="dashboard-stat-value">{questionStats.active}</strong>
+              <p className="dashboard-stat-copy">
+                Questions that students can currently receive.
+              </p>
+            </div>
+            <div className="dashboard-stat">
+              <span className="dashboard-stat-label">Students</span>
+              <strong className="dashboard-stat-value">{studentStats.total}</strong>
+              <p className="dashboard-stat-copy">
+                Registered student accounts in the system.
+              </p>
+            </div>
+            <div className="dashboard-stat">
+              <span className="dashboard-stat-label">Active Learners</span>
+              <strong className="dashboard-stat-value">{studentStats.active}</strong>
+              <p className="dashboard-stat-copy">
+                Students who have submitted at least one test.
+              </p>
+            </div>
+            <div className="dashboard-stat">
+              <span className="dashboard-stat-label">Tests Logged</span>
+              <strong className="dashboard-stat-value">
+                {studentStats.totalTestsTaken}
+              </strong>
+              <p className="dashboard-stat-copy">
+                Total diagnostics saved across all students.
+              </p>
+            </div>
+            <div className="dashboard-stat">
+              <span className="dashboard-stat-label">Average Best Score</span>
+              <strong className="dashboard-stat-value">
+                {studentStats.averageBestScore}
+              </strong>
+              <p className="dashboard-stat-copy">
+                Average of each student&apos;s highest saved score.
+              </p>
+            </div>
+          </div>
+        </article>
+
+        <article className="dashboard-card admin-panel">
+          <div className="dashboard-section-head">
+            <p className="eyebrow">Manage Students</p>
+          </div>
+
+          <p className="dashboard-section-copy">
+            Search the student list, review activity, and spot who has already
+            completed diagnostics.
+          </p>
+
+          <div className="admin-toolbar">
+            <div className="form-field admin-search-field">
+              <label htmlFor="student-search">Search by name or email</label>
+              <input
+                id="student-search"
+                type="text"
+                value={studentSearch}
+                onChange={(event) => setStudentSearch(event.target.value)}
+                placeholder="e.g. student@example.com"
+              />
+            </div>
+          </div>
+
+          {loading ? (
+            <p className="dashboard-section-copy">Loading admin workspace...</p>
+          ) : students.length ? (
+            filteredStudents.length ? (
+              <div className="admin-student-list">
+                {filteredStudents.map((student) => (
+                  <article className="admin-student-item" key={student.id}>
+                    <div className="admin-student-head">
+                      <div>
+                        <h2>{student.username}</h2>
+                        <p className="dashboard-section-copy">{student.email}</p>
+                      </div>
+                      <span className="dashboard-status-badge">
+                        {student.testsTaken > 0 ? "Active" : "New"}
+                      </span>
+                    </div>
+
+                    <div className="admin-student-metrics">
+                      <div className="admin-student-metric">
+                        <span className="dashboard-stat-label">Tests Taken</span>
+                        <strong>{student.testsTaken}</strong>
+                      </div>
+                      <div className="admin-student-metric">
+                        <span className="dashboard-stat-label">Highest Score</span>
+                        <strong>{student.highestScore}</strong>
+                      </div>
+                      <div className="admin-student-metric">
+                        <span className="dashboard-stat-label">Stored Summaries</span>
+                        <strong>{student.storedSummaries}</strong>
+                      </div>
+                      <div className="admin-student-metric">
+                        <span className="dashboard-stat-label">Latest Activity</span>
+                        <strong>
+                          {formatCompletedAt(student.latestResult?.completedAt)}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {student.latestResult ? (
+                      <div className="admin-student-latest">
+                        <div className="admin-student-latest-head">
+                          <h3>{student.latestResult.title}</h3>
+                          <span className="profile-library-score">
+                            Score: {student.latestResult.score}
+                          </span>
+                        </div>
+                        <p className="dashboard-section-copy">
+                          {student.latestResult.summary ||
+                            "The latest student summary will appear here after a submitted diagnostic."}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="dashboard-empty-state admin-student-empty">
+                        <h2>No diagnostics yet</h2>
+                        <p>
+                          This student account exists, but no completed test has been
+                          saved yet.
+                        </p>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="dashboard-empty-state">
+                <h2>No matching students</h2>
+                <p>Try a different student name or email search.</p>
+              </div>
+            )
+          ) : (
+            <div className="dashboard-empty-state">
+              <h2>No students registered yet</h2>
+              <p>Student accounts will appear here once they sign up.</p>
+            </div>
+          )}
+        </article>
+
+        <article className="dashboard-card admin-panel">
+          <div className="dashboard-section-head">
+            <p className="eyebrow">Manage Test Bank</p>
+          </div>
+
+          <p className="dashboard-section-copy">
+            Create, edit, activate, and remove CEFR diagnostic questions from one
+            place.
           </p>
 
           <div className="dashboard-stat-grid admin-stat-grid">
             <div className="dashboard-stat">
               <span className="dashboard-stat-label">Total Questions</span>
-              <strong className="dashboard-stat-value">{stats.total}</strong>
+              <strong className="dashboard-stat-value">{questionStats.total}</strong>
             </div>
             <div className="dashboard-stat">
               <span className="dashboard-stat-label">Active</span>
-              <strong className="dashboard-stat-value">{stats.active}</strong>
+              <strong className="dashboard-stat-value">{questionStats.active}</strong>
             </div>
             <div className="dashboard-stat">
               <span className="dashboard-stat-label">Inactive</span>
-              <strong className="dashboard-stat-value">{stats.inactive}</strong>
+              <strong className="dashboard-stat-value">{questionStats.inactive}</strong>
             </div>
           </div>
         </article>
@@ -267,19 +549,39 @@ export default function AdminPage() {
             <div className="admin-form-grid">
               <div className="form-field">
                 <label htmlFor="option-a">Option A</label>
-                <input id="option-a" name="optionA" value={form.optionA} onChange={handleChange} />
+                <input
+                  id="option-a"
+                  name="optionA"
+                  value={form.optionA}
+                  onChange={handleChange}
+                />
               </div>
               <div className="form-field">
                 <label htmlFor="option-b">Option B</label>
-                <input id="option-b" name="optionB" value={form.optionB} onChange={handleChange} />
+                <input
+                  id="option-b"
+                  name="optionB"
+                  value={form.optionB}
+                  onChange={handleChange}
+                />
               </div>
               <div className="form-field">
                 <label htmlFor="option-c">Option C</label>
-                <input id="option-c" name="optionC" value={form.optionC} onChange={handleChange} />
+                <input
+                  id="option-c"
+                  name="optionC"
+                  value={form.optionC}
+                  onChange={handleChange}
+                />
               </div>
               <div className="form-field">
                 <label htmlFor="option-d">Option D</label>
-                <input id="option-d" name="optionD" value={form.optionD} onChange={handleChange} />
+                <input
+                  id="option-d"
+                  name="optionD"
+                  value={form.optionD}
+                  onChange={handleChange}
+                />
               </div>
             </div>
 

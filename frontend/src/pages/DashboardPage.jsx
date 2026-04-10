@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
+import AdminPage from "./AdminPage";
 
 const QUESTION_TYPES = ["Meaning", "Context", "Collocation", "Word Form"];
 
@@ -150,6 +151,10 @@ function getCoachPlan({ testsTaken, latestTest, previousTest, levelEstimate, foc
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  if (user?.role === "admin") {
+    return <AdminPage />;
+  }
 
   const profileSummary = user?.summary ?? {};
   const testLibrary = profileSummary.testLibrary ?? [];
