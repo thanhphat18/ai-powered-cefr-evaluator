@@ -1,12 +1,81 @@
 const express = require("express");
 const crypto = require("crypto");
 const User = require("../models/User");
+const requireAuth = require("../middleware/requireAuth");
 
 const router = express.Router();
 const RESET_TOKEN_TTL_MS = 1000 * 60 * 15;
+const DEFAULT_AVATAR_URL = "/default-avatar.svg";
+const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;
+const AVATAR_DATA_URL_PATTERN = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=\s]+)$/;
 
 function hashResetToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function validateAvatarDataUrl(avatarDataUrl) {
+  if (typeof avatarDataUrl !== "string" || !avatarDataUrl.trim()) {
+    return {
+      error: "Please choose an image to upload or use the default avatar",
+    };
+  }
+
+  const matches = avatarDataUrl.match(AVATAR_DATA_URL_PATTERN);
+
+  if (!matches) {
+    return {
+      error: "Avatar must be a PNG, JPG, or WEBP image",
+    };
+  }
+
+  const [, mimeType, rawBase64Data] = matches;
+  const base64Data = rawBase64Data.replace(/\s/g, "");
+
+  let buffer;
+
+  try {
+    buffer = Buffer.from(base64Data, "base64");
+  } catch {
+    return {
+      error: "Avatar image could not be processed. Please try another file",
+    };
+  }
+
+  if (!buffer.length) {
+    return {
+      error: "Avatar image is empty. Please choose another file",
+    };
+  }
+
+  if (buffer.byteLength > MAX_AVATAR_SIZE_BYTES) {
+    return {
+      error: "Avatar image must be 2 MB or smaller",
+    };
+  }
+
+  return {
+    value: `data:${mimeType};base64,${base64Data}`,
+  };
+}
+
+function serializeUser(user) {
+  return {
+    id: user._id,
+    username: user.username,
+    email: user.email,
+    avatarUrl: user.avatarUrl || DEFAULT_AVATAR_URL,
+    summary: {
+      highestScore: user.summary?.highestScore ?? 0,
+      testsTaken: user.summary?.testsTaken ?? 0,
+      testLibrary: (user.summary?.testLibrary ?? []).map((entry) => ({
+        id: entry._id,
+        title: entry.title,
+        score: entry.score ?? 0,
+        summary: entry.summary ?? "",
+        completedAt: entry.completedAt,
+      })),
+    },
+  };
 }
 
 router.post("/register", async (req, res) => {
@@ -39,11 +108,7 @@ router.post("/register", async (req, res) => {
 
     res.status(201).json({
       message: "Registration successful",
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-      },
+      user: serializeUser(user),
     });
   } catch (error) {
     console.error("Register error:", error);
@@ -83,11 +148,7 @@ router.post("/login", async (req, res) => {
 
     res.status(200).json({
       message: "Login successful",
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-      },
+      user: serializeUser(user),
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -185,14 +246,8 @@ router.post("/reset-password/:token", async (req, res) => {
   }
 });
 
-router.get("/me", async (req, res) => {
+router.get("/me", requireAuth, async (req, res) => {
   try {
-    if (!req.session.userId) {
-      return res.status(401).json({
-        message: "Not authenticated",
-      });
-    }
-
     const user = await User.findById(req.session.userId).select("-password");
 
     if (!user) {
@@ -202,16 +257,110 @@ router.get("/me", async (req, res) => {
     }
 
     res.status(200).json({
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-      },
+      user: serializeUser(user),
     });
   } catch (error) {
     console.error("Me error:", error);
     res.status(500).json({
       message: "Server error",
+    });
+  }
+});
+
+router.post("/change-password", requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        message: "Current password and new password are required",
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        message: "New password must be at least 6 characters",
+      });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        message: "New password must be different from the current password",
+      });
+    }
+
+    const user = await User.findById(req.session.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+
+    if (!isMatch) {
+      return res.status(401).json({
+        message: "Current password is incorrect",
+      });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      message: "Password updated successfully",
+      user: serializeUser(user),
+    });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({
+      message: "Unable to update password",
+    });
+  }
+});
+
+router.post("/avatar", requireAuth, async (req, res) => {
+  try {
+    const { avatarDataUrl, useDefault } = req.body;
+
+    const user = await User.findById(req.session.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    if (useDefault) {
+      user.avatarUrl = DEFAULT_AVATAR_URL;
+      await user.save();
+
+      return res.status(200).json({
+        message: "Default avatar selected",
+        user: serializeUser(user),
+      });
+    }
+
+    const avatarValidation = validateAvatarDataUrl(avatarDataUrl);
+
+    if (avatarValidation.error) {
+      return res.status(400).json({
+        message: avatarValidation.error,
+      });
+    }
+
+    user.avatarUrl = avatarValidation.value;
+    await user.save();
+
+    res.status(200).json({
+      message: "Avatar updated successfully",
+      user: serializeUser(user),
+    });
+  } catch (error) {
+    console.error("Avatar update error:", error);
+    res.status(500).json({
+      message: "Unable to update avatar",
     });
   }
 });

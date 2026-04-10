@@ -6,6 +6,17 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const refreshUser = async () => {
+    try {
+      const response = await authApi.me();
+      setUser(response.data.user);
+      return response.data.user;
+    } catch {
+      setUser(null);
+      return null;
+    }
+  };
+
   useEffect(() => {
     const loadUser = async () => {
       try {
@@ -39,7 +50,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

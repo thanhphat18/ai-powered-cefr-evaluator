@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
+import { DEFAULT_AVATAR_URL } from "../lib/avatar";
 import { useAuth } from "../context/useAuth";
 
 export default function Navbar(){
@@ -25,9 +26,14 @@ export default function Navbar(){
             <div className="navbar-auth">
                 {loading ? null : user ? (
                     <>
-                        <span className="navbar-user" title={user.email}>
-                            {user.username || user.email}
-                        </span>
+                        <Link to="/profile" className="navbar-user navbar-user-link" title={user.email}>
+                            <img
+                                className="navbar-avatar"
+                                src={user.avatarUrl || DEFAULT_AVATAR_URL}
+                                alt={`${user.username || user.email} avatar`}
+                            />
+                            <span>{user.username || user.email}</span>
+                        </Link>
                         <button type="button" className="navbar-logout" onClick={handleLogout}>
                             Log Out
                         </button>

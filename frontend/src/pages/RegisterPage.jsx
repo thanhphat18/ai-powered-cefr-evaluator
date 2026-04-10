@@ -26,7 +26,14 @@ export default function RegisterPage() {
 
     try {
       await register({ username, email, password });
-      navigate("/dashboard");
+      navigate("/profile", {
+        replace: true,
+        state: {
+          promptAvatarSetup: true,
+          avatarSetupMessage:
+            "Registration successful. Upload an avatar now, or skip and use the default image.",
+        },
+      });
     } catch (err) {
       setError("root.serverError", {
         type: "server",
