@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -8,6 +8,7 @@ export default function RegisterPage() {
 
   const {
     register: registerField,
+    getValues,
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
@@ -16,12 +17,15 @@ export default function RegisterPage() {
       username: "",
       email: "",
       password: "",
+      confirmPassword: "",
     },
   });
 
   const onSubmit = async (data) => {
+    const { username, email, password } = data;
+
     try {
-      await register(data);
+      await register({ username, email, password });
       navigate("/dashboard");
     } catch (err) {
       setError("root.serverError", {
@@ -90,6 +94,24 @@ export default function RegisterPage() {
               })}
             />
             {errors.password ? <p className="form-error">{errors.password.message}</p> : null}
+          </div>
+
+          <div className="form-field">
+            <label htmlFor="register-confirm-password">Confirm Password</label>
+            <input
+              id="register-confirm-password"
+              type="password"
+              autoComplete="new-password"
+              placeholder="Re-enter your password"
+              {...registerField("confirmPassword", {
+                required: "Please confirm your password",
+                validate: (value) =>
+                  value === getValues("password") || "Passwords do not match",
+              })}
+            />
+            {errors.confirmPassword ? (
+              <p className="form-error">{errors.confirmPassword.message}</p>
+            ) : null}
           </div>
 
           <button type="submit" disabled={isSubmitting}>
