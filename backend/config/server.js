@@ -5,12 +5,10 @@ const cors = require("cors");
 const session = require("express-session");
 const { MongoStore } = require("connect-mongo");
 const protectedRoutes = require("../routes/protected");
-
-
 const authRoutes = require("../routes/auth");
+const testRoutes = require("../routes/tests");
 
 dotenv.config();
-
 const app = express();
 
 const PORT = process.env.PORT || 5000;
@@ -28,7 +26,6 @@ app.use(
 app.use(express.json({ limit: "5mb" }));
 
 const isProduction = process.env.NODE_ENV === "production";
-
 
 app.use(
   session({
@@ -56,6 +53,7 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/tests", testRoutes);
 app.use("/api/protected", protectedRoutes);
 
 app.use((error, req, res, next) => {
@@ -75,7 +73,6 @@ app.use((error, req, res, next) => {
     message: "Server error",
   });
 });
-
 
 async function startServer() {
   try {

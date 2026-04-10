@@ -8,6 +8,10 @@ const RESET_TOKEN_TTL_MS = 1000 * 60 * 15;
 const DEFAULT_AVATAR_URL = "/default-avatar.svg";
 const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;
 const AVATAR_DATA_URL_PATTERN = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=\s]+)$/;
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
+  .split(",")
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
 
 function hashResetToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -58,11 +62,37 @@ function validateAvatarDataUrl(avatarDataUrl) {
   };
 }
 
+function isConfiguredAdminEmail(email) {
+  return ADMIN_EMAILS.includes((email || "").trim().toLowerCase());
+}
+
+async function determineRoleForNewUser(email) {
+  const adminCount = await User.countDocuments({ role: "admin" });
+
+  if (isConfiguredAdminEmail(email) || adminCount === 0) {
+    return "admin";
+  }
+
+  return "student";
+}
+
+async function ensureUserRole(user) {
+  if (user.role) {
+    return user;
+  }
+
+  user.role = await determineRoleForNewUser(user.email);
+  await user.save();
+
+  return user;
+}
+
 function serializeUser(user) {
   return {
     id: user._id,
     username: user.username,
     email: user.email,
+    role: user.role || "student",
     avatarUrl: user.avatarUrl || DEFAULT_AVATAR_URL,
     summary: {
       highestScore: user.summary?.highestScore ?? 0,
@@ -99,6 +129,7 @@ router.post("/register", async (req, res) => {
     const user = new User({
       username,
       email,
+      role: await determineRoleForNewUser(email),
       password,
     });
 
@@ -143,6 +174,8 @@ router.post("/login", async (req, res) => {
         message: "Invalid email or password",
       });
     }
+
+    await ensureUserRole(user);
 
     req.session.userId = user._id;
 
@@ -255,6 +288,8 @@ router.get("/me", requireAuth, async (req, res) => {
         message: "User not found",
       });
     }
+
+    await ensureUserRole(user);
 
     res.status(200).json({
       user: serializeUser(user),

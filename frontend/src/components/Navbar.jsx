@@ -21,6 +21,11 @@ export default function Navbar(){
                     <Link to="/dashboard" className="navbar-link">
                         Home
                     </Link>
+                    {user?.role === "admin" ? (
+                        <Link to="/admin" className="navbar-link">
+                            Admin
+                        </Link>
+                    ) : null}
                 </div>
             </div>
             <div className="navbar-auth">
@@ -33,6 +38,9 @@ export default function Navbar(){
                                 alt={`${user.username || user.email} avatar`}
                             />
                             <span>{user.username || user.email}</span>
+                            <span className="navbar-role-badge">
+                                {user.role || "student"}
+                            </span>
                         </Link>
                         <button type="button" className="navbar-logout" onClick={handleLogout}>
                             Log Out

@@ -178,8 +178,9 @@ export default function DashboardPage() {
             <p className="dashboard-copy">
               Welcome back,{" "}
               <span className="welcome-name">{user?.username || user?.email}</span>.
-              This workspace keeps your CEFR progress concise, clear, and ready for
-              the next study decision.
+              {user?.role === "admin"
+                ? " You can manage the question bank and still use the student test flow from the same workspace."
+                : " This workspace keeps your CEFR progress concise, clear, and ready for the next study decision."}
             </p>
 
             <div className="dashboard-pill-row">
@@ -197,8 +198,12 @@ export default function DashboardPage() {
             </p>
 
             <div className="dashboard-action-row">
-              <button type="button" className="dashboard-primary-button" disabled>
-                Start Test Soon
+              <button
+                type="button"
+                className="dashboard-primary-button"
+                onClick={() => navigate("/test")}
+              >
+                Start Test
               </button>
               <button
                 type="button"
@@ -207,6 +212,15 @@ export default function DashboardPage() {
               >
                 Review Results
               </button>
+              {user?.role === "admin" ? (
+                <button
+                  type="button"
+                  className="dashboard-secondary-button"
+                  onClick={() => navigate("/admin")}
+                >
+                  Admin Dashboard
+                </button>
+              ) : null}
             </div>
           </div>
         </section>
