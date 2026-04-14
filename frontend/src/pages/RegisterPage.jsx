@@ -18,14 +18,20 @@ export default function RegisterPage() {
       email: "",
       password: "",
       confirmPassword: "",
+      trainingDataConsent: false,
     },
   });
 
   const onSubmit = async (data) => {
-    const { username, email, password } = data;
+    const { username, email, password, trainingDataConsent } = data;
 
     try {
-      const response = await register({ username, email, password });
+      const response = await register({
+        username,
+        email,
+        password,
+        trainingDataConsent,
+      });
 
       if (response.data.user?.role === "admin") {
         navigate("/dashboard", {
@@ -128,6 +134,15 @@ export default function RegisterPage() {
               <p className="form-error">{errors.confirmPassword.message}</p>
             ) : null}
           </div>
+
+          <label className="admin-checkbox" htmlFor="register-training-consent">
+            <input
+              id="register-training-consent"
+              type="checkbox"
+              {...registerField("trainingDataConsent")}
+            />
+            Share anonymized test results to improve future recommendation models.
+          </label>
 
           <button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Creating account..." : "Register"}

@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import AdminPage from "./AdminPage";
 
-const QUESTION_TYPES = ["Meaning", "Context", "Collocation", "Word Form"];
+const QUESTION_TYPES = ["Meaning", "Context", "Collocation", "Word Form", "Mixed"];
 
 function formatCompletedAt(value) {
   if (!value) {
@@ -67,6 +67,20 @@ function getLevelEstimate(score) {
 }
 
 function inferFocusArea(testLibrary) {
+  const latestRecommendation = testLibrary.find(
+    (entry) => entry.recommendation?.focusSkill
+  )?.recommendation;
+
+  if (latestRecommendation?.focusSkill) {
+    return {
+      label: latestRecommendation.focusSkill,
+      detail:
+        latestRecommendation.rationale ||
+        latestRecommendation.summary ||
+        "The latest saved recommendation is ready to guide your next study block.",
+    };
+  }
+
   const skillPatterns = [
     {
       label: "Meaning",
@@ -99,7 +113,14 @@ function inferFocusArea(testLibrary) {
   return matchedSkill || null;
 }
 
-function getCoachPlan({ testsTaken, latestTest, previousTest, levelEstimate, focusArea }) {
+function getCoachPlan({
+  testsTaken,
+  latestTest,
+  previousTest,
+  levelEstimate,
+  focusArea,
+  latestRecommendation,
+}) {
   if (!testsTaken || !latestTest) {
     return {
       status: "Coach setup",
@@ -129,21 +150,27 @@ function getCoachPlan({ testsTaken, latestTest, previousTest, levelEstimate, foc
   const focusSummary = focusArea
     ? `Right now, the clearest practice target is ${focusArea.label.toLowerCase()}.`
     : "Skill-level feedback is not saved yet, so the coach is using your overall performance only.";
+  const recommendationSummary = latestRecommendation?.summary
+    ? ` ${latestRecommendation.summary}`
+    : "";
 
   return {
     status,
     title: `${levelEstimate.label} trajectory in progress`,
-    summary: `Your latest saved score is ${latestTest.score ?? 0}. ${focusSummary} ${levelEstimate.detail}`,
+    summary: `Your latest saved score is ${latestTest.score ?? 0}. ${focusSummary} ${levelEstimate.detail}${recommendationSummary}`,
     actions: [
-      focusArea
-        ? `Spend your next review block on ${focusArea.label.toLowerCase()} questions first.`
-        : "Add skill-tagged results later so the coach can detect a true weakest area.",
+      latestRecommendation?.resources?.techniques?.[0]
+        ? latestRecommendation.resources.techniques[0]
+        : focusArea
+          ? `Spend your next review block on ${focusArea.label.toLowerCase()} questions first.`
+          : "Add skill-tagged results later so the coach can detect a true weakest area.",
       scoreDelta === null
         ? "Complete one more diagnostic to unlock a real progress comparison."
         : scoreDelta >= 0
           ? `Keep the same study rhythm. You improved by ${scoreDelta} point${scoreDelta === 1 ? "" : "s"} on the latest saved result.`
           : `Compare the last two results and revisit the mistakes that caused the ${Math.abs(scoreDelta)}-point drop.`,
-      "Use the saved result summary as the bridge between testing and the next study session.",
+      latestRecommendation?.resources?.techniques?.[1] ||
+        "Use the saved result summary as the bridge between testing and the next study session.",
     ],
   };
 }
@@ -165,12 +192,14 @@ export default function DashboardPage() {
   const highestScore = profileSummary.highestScore ?? 0;
   const levelEstimate = getLevelEstimate(highestScore);
   const focusArea = inferFocusArea(recentTests);
+  const latestRecommendation = latestTest?.recommendation ?? null;
   const coachPlan = getCoachPlan({
     testsTaken,
     latestTest,
     previousTest,
     levelEstimate,
     focusArea,
+    latestRecommendation,
   });
 
   return (
@@ -322,6 +351,11 @@ export default function DashboardPage() {
                     <p className="dashboard-history-summary">
                       {entry.summary || "A generated performance summary will appear here."}
                     </p>
+                    {entry.recommendation?.title ? (
+                      <p className="dashboard-history-date">
+                        Recommended next step: {entry.recommendation.title}
+                      </p>
+                    ) : null}
                     <p className="dashboard-history-date">
                       Completed: {formatCompletedAt(entry.completedAt)}
                     </p>
