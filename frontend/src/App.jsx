@@ -4,6 +4,7 @@ import DashboardPage from "./pages/DashboardPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import LoginPage from "./pages/LoginPage";
 import AdminPage from "./pages/AdminPage";
+import ManageTestBankPage from "./pages/ManageTestBankPage";
 import ProfilePage from "./pages/ProfilePage";
 import RegisterPage from "./pages/RegisterPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
@@ -23,6 +24,14 @@ export default function App() {
           element={
             <ProtectedRoute requiredRole="admin">
               <AdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/test-bank"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <ManageTestBankPage />
             </ProtectedRoute>
           }
         />

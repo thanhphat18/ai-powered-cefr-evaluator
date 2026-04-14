@@ -1,0 +1,160 @@
+{
+  "project": {
+    "name": "cefr-recommendation-classifier",
+    "version": "1.0.0",
+    "model": "multiclass-logistic-regression",
+    "predictionTarget": "recommendation_label",
+    "description": "Predicts the best study recommendation label from a completed CEFR diagnostic result while leaving grading and study-content generation in application code.",
+    "features": [
+      "overall_score_ratio",
+      "estimated_level",
+      "unanswered_ratio",
+      "a2_accuracy",
+      "b1_accuracy",
+      "b2_accuracy",
+      "meaning_accuracy",
+      "context_accuracy",
+      "collocation_accuracy",
+      "word_form_accuracy",
+      "weakest_type",
+      "strongest_type"
+    ]
+  },
+  "defaults": {
+    "fallbackLabel": "b1_bridge_builder"
+  },
+  "labels": {
+    "foundation_meaning": {
+      "id": "foundation_meaning",
+      "title": "Rebuild Core Meaning",
+      "focusType": "meaning",
+      "summaryTemplate": "Your {estimatedLevel} result shows that {weakestSkill} questions are still dragging down the rest of the test. Rebuild high-frequency word knowledge first, then return to mixed practice.",
+      "rationaleTemplate": "Because {weakestSkill} is currently weaker than {strongestSkill}, stronger meaning control should lift accuracy across every other question type.",
+      "books": [
+        "English Vocabulary in Use Elementary",
+        "Oxford Word Skills Basic",
+        "Vocabulary in Practice 1"
+      ],
+      "courses": [
+        "BBC Learning English vocabulary lessons",
+        "British Council vocabulary practice",
+        "Quizlet high-frequency academic word sets"
+      ],
+      "techniques": [
+        "Review 15 high-frequency words per day with synonym, antonym, and one sentence.",
+        "Use two-pass correction: choose an answer, then explain why the other options are wrong.",
+        "Group missed words into word families instead of memorizing isolated items."
+      ]
+    },
+    "context_clues_boost": {
+      "id": "context_clues_boost",
+      "title": "Strengthen Context Clues",
+      "focusType": "context",
+      "summaryTemplate": "Your {estimatedLevel} band is forming, but sentence-context questions are lowering your final score. Train yourself to read clue words before locking in an option.",
+      "rationaleTemplate": "Your strongest work is in {strongestSkill}, so the next gain comes from turning sentence clues into faster decisions when {weakestSkill} items appear.",
+      "books": [
+        "English Vocabulary in Use Pre-intermediate and Intermediate",
+        "Reading Explorer Foundations",
+        "Oxford Word Skills Intermediate"
+      ],
+      "courses": [
+        "BBC Learning English News Review",
+        "British Council reading and context practice",
+        "Cambridge English vocabulary activities"
+      ],
+      "techniques": [
+        "Underline tense, tone, and connector words before answering.",
+        "Predict the missing word type first, then compare answer choices.",
+        "Practice sentence-completion sets in short timed batches of five."
+      ]
+    },
+    "collocation_pattern_builder": {
+      "id": "collocation_pattern_builder",
+      "title": "Build Collocation Patterns",
+      "focusType": "collocation",
+      "summaryTemplate": "You can already recognize many target words, but natural word partnerships are holding back your {estimatedLevel} progress. Shift practice toward phrases instead of single words.",
+      "rationaleTemplate": "Since {weakestSkill} is the weakest area and {strongestSkill} is already steadier, phrase-level repetition should make your answers sound more natural and precise.",
+      "books": [
+        "English Collocations in Use Intermediate",
+        "Oxford Collocations Dictionary for Students of English",
+        "English Vocabulary Organiser"
+      ],
+      "courses": [
+        "BBC Learning English phrase and collocation lessons",
+        "British Council speaking and vocabulary practice",
+        "YouGlish collocation review sessions"
+      ],
+      "techniques": [
+        "Collect missed answers as two-word or three-word chunks, not single terms.",
+        "Build a weekly notebook of common verb-noun and adjective-noun pairs.",
+        "Repeat collocation drills aloud so the pattern becomes automatic."
+      ]
+    },
+    "word_form_control": {
+      "id": "word_form_control",
+      "title": "Tighten Word Form Control",
+      "focusType": "word-form",
+      "summaryTemplate": "Your score suggests the main drag is word-form control. To move beyond {estimatedLevel}, practice prefixes, suffixes, and part-of-speech shifts inside full sentences.",
+      "rationaleTemplate": "You already show better control in {strongestSkill}, so the fastest improvement comes from reducing errors in {weakestSkill} when grammar and vocabulary interact.",
+      "books": [
+        "English Grammar in Use",
+        "Oxford Word Skills Intermediate",
+        "Check Your Vocabulary for English Language Exams"
+      ],
+      "courses": [
+        "Perfect English Grammar word formation practice",
+        "British Council grammar and vocabulary lessons",
+        "BBC Learning English grammar challenge"
+      ],
+      "techniques": [
+        "Create word-family tables with noun, verb, adjective, and adverb forms.",
+        "Practice filling blanks only after deciding which part of speech is required.",
+        "Review prefixes and suffixes in small themed sets three times per week."
+      ]
+    },
+    "b1_bridge_builder": {
+      "id": "b1_bridge_builder",
+      "title": "Bridge Toward B1 Stability",
+      "focusType": "mixed",
+      "summaryTemplate": "Your result is close to stable B1 work. The best next step is mixed review that connects meaning, context, collocation, and form instead of isolating one skill only.",
+      "rationaleTemplate": "Because your accuracy is more balanced overall, a structured mixed routine will turn partial control into a steadier {estimatedLevel}-to-B1 transition.",
+      "books": [
+        "English Vocabulary in Use Pre-intermediate and Intermediate",
+        "Oxford Word Skills Intermediate",
+        "Vocabulary for IELTS"
+      ],
+      "courses": [
+        "British Council B1 vocabulary and reading practice",
+        "BBC Learning English course archive",
+        "Cambridge English B1 preparation activities"
+      ],
+      "techniques": [
+        "Rotate through four mini-sets: meaning, context, collocation, and word form.",
+        "Review wrong answers in one notebook with a short rule under each item.",
+        "Finish each study block with five timed mixed questions."
+      ]
+    },
+    "b2_precision_push": {
+      "id": "b2_precision_push",
+      "title": "Push Toward B2 Precision",
+      "focusType": "mixed",
+      "summaryTemplate": "You are already moving into stronger territory. To push toward B2, focus on precision: nuanced meaning, natural collocation, and accurate choices under time pressure.",
+      "rationaleTemplate": "Your overall profile is solid enough that the next gains come from sharpening precision, especially when {weakestSkill} appears inside harder mixed items.",
+      "books": [
+        "English Vocabulary in Use Upper-intermediate",
+        "English Collocations in Use Advanced",
+        "Oxford Word Skills Advanced"
+      ],
+      "courses": [
+        "BBC Learning English advanced vocabulary lessons",
+        "British Council B2 vocabulary practice",
+        "Cambridge English B2 preparation activities"
+      ],
+      "techniques": [
+        "Track near-synonyms and note when each one sounds more natural.",
+        "Practice mixed timed sets of ten questions and review only the borderline choices.",
+        "Write one new sentence for every missed item to lock in nuance and register."
+      ]
+    }
+  }
+}

@@ -2,15 +2,18 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { testsApi } from "../lib/api";
 import { useAuth } from "../context/useAuth";
+import { formatTypeLabel } from "../lib/testBank";
 
 const EMPTY_QUESTIONS = [];
 
-function formatTypeLabel(type) {
-  if (type === "word-form") {
-    return "Word Form";
+function formatLevelTargets(levelTargets) {
+  if (!Array.isArray(levelTargets) || !levelTargets.length) {
+    return "10 A2, 10 B1, and 10 B2";
   }
 
-  return type.charAt(0).toUpperCase() + type.slice(1);
+  return levelTargets
+    .map((target) => `${target.count} ${target.level}`)
+    .join(", ");
 }
 
 function getCompletionPercent(answeredCount, totalQuestions) {
@@ -31,7 +34,7 @@ function formatCountdown(totalSeconds) {
 
 export default function TestPage() {
   const navigate = useNavigate();
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [session, setSession] = useState(null);
   const [answers, setAnswers] = useState({});
   const [activeIndex, setActiveIndex] = useState(0);
@@ -285,6 +288,61 @@ export default function TestPage() {
             </div>
           </article>
 
+          {result.recommendation ? (
+            <article className="test-card test-recommendation-card">
+              <p className="eyebrow">Recommended Next Step</p>
+              <h2>{result.recommendation.title}</h2>
+              <p className="test-copy">{result.recommendation.summary}</p>
+              <p className="test-copy">{result.recommendation.rationale}</p>
+
+              <div className="test-chip-list">
+                <span className="test-chip">
+                  Focus: {result.recommendation.focusSkill}
+                </span>
+                <span className="test-chip">
+                  {result.recommendation.source === "ml-service"
+                    ? "ML-guided recommendation"
+                    : "Rule-guided recommendation"}
+                </span>
+              </div>
+
+              <div className="test-recommendation-grid">
+                <div className="test-breakdown-block">
+                  <h3>Books</h3>
+                  <div className="test-recommendation-list">
+                    {result.recommendation.resources?.books?.map((item) => (
+                      <p className="test-recommendation-item" key={item}>
+                        {item}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="test-breakdown-block">
+                  <h3>Courses</h3>
+                  <div className="test-recommendation-list">
+                    {result.recommendation.resources?.courses?.map((item) => (
+                      <p className="test-recommendation-item" key={item}>
+                        {item}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="test-breakdown-block">
+                  <h3>Techniques</h3>
+                  <div className="test-recommendation-list">
+                    {result.recommendation.resources?.techniques?.map((item) => (
+                      <p className="test-recommendation-item" key={item}>
+                        {item}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </article>
+          ) : null}
+
           <article className="test-card">
             <p className="eyebrow">Breakdown</p>
             <div className="test-breakdown-grid">
@@ -322,21 +380,41 @@ export default function TestPage() {
     );
   }
 
-  if (!session || !currentQuestion) {
+  if (!session || session.isUnavailable || !currentQuestion) {
+    const unavailableMessage = session?.message
+      ? session.message
+      : session?.isEmptyBank
+      ? user?.role === "admin"
+        ? "No active questions are available. Add questions manually or import them from CSV in the test-bank manager before starting a test."
+        : "No active questions are available right now. Please ask your administrator to add or activate test-bank questions."
+      : error || "The test session could not be prepared.";
+
     return (
       <main className="test-page">
         <section className="test-card">
           <p className="eyebrow">Test Workspace</p>
           <h1>Test unavailable</h1>
-          <p className="test-copy">
-            {error || "The test session could not be prepared."}
-          </p>
+          <p className="test-copy">{unavailableMessage}</p>
+          {session?.missingRequirements?.length ? (
+            <div className="test-coverage-block">
+              <h3>Missing coverage</h3>
+              <div className="test-chip-list">
+                {session.missingRequirements.map((entry) => (
+                  <span className="test-chip" key={entry.level}>
+                    {entry.level}: {entry.available}/{entry.required}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <button
             type="button"
             className="dashboard-secondary-button"
-            onClick={() => navigate("/dashboard")}
+            onClick={() =>
+              navigate(user?.role === "admin" ? "/admin/test-bank" : "/dashboard")
+            }
           >
-            Return to Dashboard
+            {user?.role === "admin" ? "Open Test Bank Manager" : "Return to Dashboard"}
           </button>
         </section>
       </main>
@@ -352,9 +430,9 @@ export default function TestPage() {
             <p className="test-copy">
               {session.mode === "resume"
                 ? "An unfinished session was found, so the page restored the same question set for you."
-                : session.isSample
-              ? `The page is currently using ${session.totalQuestions} sample questions from the new test-bank collection so we can verify the full flow before you upload the real 90-question set.`
-                : "This session is using the full question bank."}
+                : `This session uses ${session.requestedQuestionCount} randomly selected questions with a fixed balance of ${formatLevelTargets(
+                    session.levelTargets
+                  )}.`}
             </p>
 
           <div className="test-progress-card">
@@ -415,12 +493,6 @@ export default function TestPage() {
               <div>
                 <p className="eyebrow">Question {activeIndex + 1}</p>
                 <p className="test-question-prompt">{currentQuestion.prompt}</p>
-              </div>
-              <div className="test-question-tags">
-                <span className="test-chip">{currentQuestion.level}</span>
-                <span className="test-chip">
-                  {formatTypeLabel(currentQuestion.type)}
-                </span>
               </div>
             </div>
 
@@ -486,8 +558,8 @@ export default function TestPage() {
             <h2>How this first version works</h2>
             <div className="dashboard-checklist">
               <p className="dashboard-check-item">
-                Questions are loaded from MongoDB through the new test-bank
-                collection.
+                Questions are drawn from the active MongoDB test bank using the
+                fixed 30-question rule: 10 A2, 10 B1, and 10 B2.
               </p>
               <p className="dashboard-check-item">
                 When you submit, the score is stored in your user summary so the

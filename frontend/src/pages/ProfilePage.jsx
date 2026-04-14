@@ -28,6 +28,24 @@ function formatCompletedAt(value) {
   });
 }
 
+function formatConsentDate(value) {
+  if (!value) {
+    return "Not enabled";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Not enabled";
+  }
+
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -321,6 +339,9 @@ function StudentProfileContent({ user, refreshUser }) {
   const [showAvatarPrompt, setShowAvatarPrompt] = useState(
     Boolean(location.state?.promptAvatarSetup)
   );
+  const [privacyMessage, setPrivacyMessage] = useState("");
+  const [privacyError, setPrivacyError] = useState("");
+  const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
 
   const {
     register: registerField,
@@ -342,6 +363,8 @@ function StudentProfileContent({ user, refreshUser }) {
   const avatarPreviewUrl = pendingAvatarDataUrl || currentAvatarUrl;
   const profileSummary = user?.summary ?? {};
   const testLibrary = profileSummary.testLibrary ?? [];
+  const trainingDataConsent = Boolean(user?.privacy?.trainingDataConsent);
+  const trainingDataConsentAt = user?.privacy?.trainingDataConsentAt;
 
   const handlePasswordEditorToggle = () => {
     setIsEditingPassword((current) => !current);
@@ -470,6 +493,34 @@ function StudentProfileContent({ user, refreshUser }) {
       "Using the default avatar for now. You can upload a custom one later on this page."
     );
     setShowAvatarPrompt(false);
+  };
+
+  const handleTrainingConsentChange = async (event) => {
+    const nextTrainingDataConsent = event.target.checked;
+
+    setPrivacyMessage("");
+    setPrivacyError("");
+    setIsUpdatingPrivacy(true);
+
+    try {
+      const response = await authApi.updatePrivacy({
+        trainingDataConsent: nextTrainingDataConsent,
+      });
+
+      await refreshUser();
+      setPrivacyMessage(
+        response.data.message ||
+          (nextTrainingDataConsent
+            ? "Anonymized training data sharing is enabled"
+            : "Anonymized training data sharing is disabled")
+      );
+    } catch (error) {
+      setPrivacyError(
+        error.response?.data?.message || "Unable to update data sharing settings"
+      );
+    } finally {
+      setIsUpdatingPrivacy(false);
+    }
   };
 
   return (
@@ -690,6 +741,43 @@ function StudentProfileContent({ user, refreshUser }) {
             private library.
           </p>
         </article>
+
+        <article className="profile-card profile-summary-card">
+          <p className="eyebrow">Data Sharing</p>
+          <h2 className="admin-profile-title">Anonymized Training Data</h2>
+          <p className="profile-note">
+            When this is enabled, completed test results are copied into a
+            separate anonymized dataset for future model training. Your account
+            email and profile fields are not written into that training dataset.
+          </p>
+
+          <label className="admin-checkbox" htmlFor="profile-training-consent">
+            <input
+              id="profile-training-consent"
+              type="checkbox"
+              checked={trainingDataConsent}
+              onChange={handleTrainingConsentChange}
+              disabled={isUpdatingPrivacy}
+            />
+            Allow anonymized test results to be collected for model improvement.
+          </label>
+
+          <p className="profile-note">
+            Consent recorded: {formatConsentDate(trainingDataConsentAt)}
+          </p>
+
+          {privacyMessage ? (
+            <p className="auth-info" role="status">
+              {privacyMessage}
+            </p>
+          ) : null}
+
+          {privacyError ? (
+            <p className="auth-alert" role="alert">
+              {privacyError}
+            </p>
+          ) : null}
+        </article>
       </section>
 
       <section className="profile-card profile-library-card">
@@ -705,6 +793,26 @@ function StudentProfileContent({ user, refreshUser }) {
                 <p className="profile-library-summary">
                   {entry.summary || "A generated summary for this test will appear here."}
                 </p>
+                {entry.recommendation?.title ? (
+                  <div className="profile-library-recommendation">
+                    <p className="profile-library-label">Recommended next step</p>
+                    <h3>{entry.recommendation.title}</h3>
+                    <p className="profile-library-summary">
+                      {entry.recommendation.summary}
+                    </p>
+                    {entry.recommendation.resources?.techniques?.length ? (
+                      <div className="profile-library-chip-row">
+                        {entry.recommendation.resources.techniques
+                          .slice(0, 2)
+                          .map((technique) => (
+                            <span className="profile-library-technique" key={technique}>
+                              {technique}
+                            </span>
+                          ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 <p className="profile-library-date">
                   Completed: {formatCompletedAt(entry.completedAt)}
                 </p>

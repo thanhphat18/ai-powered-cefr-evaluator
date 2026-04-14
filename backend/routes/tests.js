@@ -1,15 +1,32 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const User = require("../models/User");
 const TestQuestion = require("../models/TestQuestion");
 const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
-const sampleTestBank = require("../data/sampleTestBank");
+const {
+  buildPredictionFeatures,
+  predictRecommendation,
+} = require("../services/recommendations");
+const { captureTrainingEvent } = require("../services/trainingData");
+const {
+  LEVEL_ORDER,
+  TYPE_ORDER,
+  normalizeQuestionInput,
+  parseCsvQuestionBank,
+} = require("../utils/testBank");
 
 const router = express.Router();
 
-const LEVEL_ORDER = ["A1", "A2", "B1", "B2"];
-const TYPE_ORDER = ["meaning", "context", "collocation", "word-form"];
-const TARGET_QUESTION_COUNT = 10;
+const TEST_LEVEL_TARGETS = [
+  { level: "A2", count: 10 },
+  { level: "B1", count: 10 },
+  { level: "B2", count: 10 },
+];
+const TARGET_QUESTION_COUNT = TEST_LEVEL_TARGETS.reduce(
+  (sum, target) => sum + target.count,
+  0
+);
 const TEST_DURATION_SECONDS = 25 * 60;
 
 function shuffle(items) {
@@ -116,16 +133,61 @@ function saveSession(req) {
   });
 }
 
-async function ensureSampleTestBank() {
-  const existingCount = await TestQuestion.countDocuments();
+function getLevelTargetShortages(questionBank) {
+  return TEST_LEVEL_TARGETS.map((target) => {
+    const available = questionBank.filter(
+      (question) => question.level === target.level
+    ).length;
 
-  if (existingCount > 0) {
-    return existingCount;
+    return {
+      level: target.level,
+      required: target.count,
+      available,
+    };
+  }).filter((entry) => entry.available < entry.required);
+}
+
+function buildBalancedQuestionSet(questionBank) {
+  const shortages = getLevelTargetShortages(questionBank);
+
+  if (shortages.length) {
+    return {
+      questions: [],
+      shortages,
+    };
   }
 
-  await TestQuestion.insertMany(sampleTestBank);
+  const selectedQuestions = TEST_LEVEL_TARGETS.flatMap((target) =>
+    shuffle(
+      questionBank.filter((question) => question.level === target.level)
+    ).slice(0, target.count)
+  );
 
-  return sampleTestBank.length;
+  return {
+    questions: shuffle(selectedQuestions),
+    shortages: [],
+  };
+}
+
+function buildUnavailableSession({ questionBank, message, shortages, isEmptyBank }) {
+  return {
+    title: "Question Bank Unavailable",
+    startedAt: null,
+    durationSeconds: TEST_DURATION_SECONDS,
+    requestedQuestionCount: TARGET_QUESTION_COUNT,
+    totalQuestions: 0,
+    isSample: false,
+    isEmptyBank,
+    isUnavailable: true,
+    message,
+    missingRequirements: shortages,
+    levelTargets: TEST_LEVEL_TARGETS,
+    coverage: {
+      levels: buildCoverage(questionBank, "level", LEVEL_ORDER),
+      types: buildCoverage(questionBank, "type", TYPE_ORDER),
+    },
+    questions: [],
+  };
 }
 
 function deriveEstimatedLevel(levelBreakdown, percentageScore) {
@@ -164,9 +226,9 @@ function buildPerformanceSummary({
 
 router.get("/bank", requireRole("admin"), async (req, res) => {
   try {
-    await ensureSampleTestBank();
-
-    const questions = await TestQuestion.find().sort({ createdAt: -1 }).lean();
+    const questions = await TestQuestion.find()
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .lean();
 
     res.status(200).json({
       questions: questions.map(toAdminQuestion),
@@ -181,7 +243,8 @@ router.get("/bank", requireRole("admin"), async (req, res) => {
 
 router.post("/bank", requireRole("admin"), async (req, res) => {
   try {
-    const question = new TestQuestion(req.body);
+    const payload = normalizeQuestionInput(req.body);
+    const question = new TestQuestion(payload);
     await question.save();
 
     res.status(201).json({
@@ -196,6 +259,69 @@ router.post("/bank", requireRole("admin"), async (req, res) => {
   }
 });
 
+router.post("/bank/import", requireRole("admin"), async (req, res) => {
+  try {
+    const questionsToCreate = parseCsvQuestionBank(req.body?.csvText);
+    const createdQuestions = await TestQuestion.insertMany(questionsToCreate, {
+      ordered: true,
+    });
+
+    res.status(201).json({
+      message: `Imported ${createdQuestions.length} question${
+        createdQuestions.length === 1 ? "" : "s"
+      } successfully`,
+      importedCount: createdQuestions.length,
+      questions: createdQuestions
+        .map(toAdminQuestion)
+        .sort(
+          (left, right) => new Date(right.updatedAt) - new Date(left.updatedAt)
+        ),
+    });
+  } catch (error) {
+    console.error("Import test bank CSV error:", error);
+    res.status(error.status || 400).json({
+      message: error.message || "Unable to import questions from CSV",
+      details: error.details || [],
+    });
+  }
+});
+
+router.delete("/bank", requireRole("admin"), async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids)
+      ? req.body.ids.map((id) => String(id).trim()).filter(Boolean)
+      : [];
+
+    if (!ids.length) {
+      return res.status(400).json({
+        message: "Please select at least one question to remove",
+      });
+    }
+
+    if (ids.some((id) => !mongoose.isValidObjectId(id))) {
+      return res.status(400).json({
+        message: "One or more selected question ids are invalid",
+      });
+    }
+
+    const result = await TestQuestion.deleteMany({
+      _id: { $in: ids },
+    });
+
+    res.status(200).json({
+      message: `Removed ${result.deletedCount} question${
+        result.deletedCount === 1 ? "" : "s"
+      } successfully`,
+      deletedCount: result.deletedCount,
+    });
+  } catch (error) {
+    console.error("Bulk remove test bank questions error:", error);
+    res.status(500).json({
+      message: "Unable to remove the selected questions",
+    });
+  }
+});
+
 router.put("/bank/:questionId", requireRole("admin"), async (req, res) => {
   try {
     const question = await TestQuestion.findById(req.params.questionId);
@@ -206,13 +332,15 @@ router.put("/bank/:questionId", requireRole("admin"), async (req, res) => {
       });
     }
 
-    question.level = req.body.level;
-    question.type = req.body.type;
-    question.prompt = req.body.prompt;
-    question.options = req.body.options;
-    question.correctOptionId = req.body.correctOptionId;
-    question.explanation = req.body.explanation;
-    question.isActive = Boolean(req.body.isActive);
+    const payload = normalizeQuestionInput(req.body);
+
+    question.level = payload.level;
+    question.type = payload.type;
+    question.prompt = payload.prompt;
+    question.options = payload.options;
+    question.correctOptionId = payload.correctOptionId;
+    question.explanation = payload.explanation;
+    question.isActive = payload.isActive;
 
     await question.save();
 
@@ -268,10 +396,8 @@ router.get("/admin/students", requireRole("admin"), async (req, res) => {
 
 router.get("/session", requireAuth, async (req, res) => {
   try {
-    await ensureSampleTestBank();
-
     const questionBank = await TestQuestion.find({ isActive: true }).lean();
-    const expectedQuestionCount = Math.min(TARGET_QUESTION_COUNT, questionBank.length);
+    const expectedQuestionCount = TARGET_QUESTION_COUNT;
     let selectedQuestions = [];
     let sessionMode = "new";
     const sessionExpired =
@@ -292,20 +418,54 @@ router.get("/session", requireAuth, async (req, res) => {
         resumedQuestions,
         req.session.activeTest.questionIds
       );
-      sessionMode = "resume";
+      if (selectedQuestions.length === expectedQuestionCount) {
+        sessionMode = "resume";
+      } else {
+        selectedQuestions = [];
+      }
     }
 
     if (!selectedQuestions.length) {
-      selectedQuestions = shuffle(questionBank).slice(
-        0,
-        Math.min(TARGET_QUESTION_COUNT, questionBank.length)
-      );
+      if (!questionBank.length) {
+        req.session.activeTest = null;
+        await saveSession(req);
+
+        return res.status(200).json({
+          session: buildUnavailableSession({
+            questionBank,
+            message:
+              "No active questions are available in the test bank. Add or activate questions before starting a test.",
+            shortages: TEST_LEVEL_TARGETS.map((target) => ({
+              level: target.level,
+              required: target.count,
+              available: 0,
+            })),
+            isEmptyBank: true,
+          }),
+        });
+      }
+
+      const { questions, shortages } = buildBalancedQuestionSet(questionBank);
+
+      if (shortages.length) {
+        req.session.activeTest = null;
+        await saveSession(req);
+
+        return res.status(200).json({
+          session: buildUnavailableSession({
+            questionBank,
+            message:
+              "The active test bank does not yet meet the balanced 30-question rule. The system needs 10 active A2, 10 active B1, and 10 active B2 questions.",
+            shortages,
+            isEmptyBank: false,
+          }),
+        });
+      }
+
+      selectedQuestions = questions;
 
       req.session.activeTest = {
-        title:
-          selectedQuestions.length < TARGET_QUESTION_COUNT
-            ? "Sample CEFR Diagnostic"
-            : "CEFR Vocabulary Diagnostic",
+        title: "CEFR Vocabulary Diagnostic • 30 Questions",
         questionIds: selectedQuestions.map((question) => String(question._id)),
         startedAt: new Date().toISOString(),
       };
@@ -321,7 +481,11 @@ router.get("/session", requireAuth, async (req, res) => {
         durationSeconds: TEST_DURATION_SECONDS,
         requestedQuestionCount: TARGET_QUESTION_COUNT,
         totalQuestions: selectedQuestions.length,
-        isSample: selectedQuestions.length < TARGET_QUESTION_COUNT,
+        isSample: false,
+        isEmptyBank: false,
+        isUnavailable: false,
+        missingRequirements: [],
+        levelTargets: TEST_LEVEL_TARGETS,
         mode: sessionMode,
         coverage: {
           levels: buildCoverage(questionBank, "level", LEVEL_ORDER),
@@ -425,12 +589,47 @@ router.post("/submit", requireAuth, async (req, res) => {
 
     const weakestType = rankedTypes[0]?.type || "meaning";
     const strongestType = [...rankedTypes].reverse()[0]?.type || "meaning";
+    const unansweredCount = expectedQuestionIds.filter(
+      (questionId) => !answers[questionId]
+    ).length;
+    const predictionFeatures = buildPredictionFeatures({
+      score: percentageScore,
+      estimatedLevel,
+      unansweredCount,
+      totalQuestions,
+      levelBreakdown,
+      typeBreakdown,
+      weakestType,
+      strongestType,
+    });
     const summary = buildPerformanceSummary({
       estimatedLevel,
       weakestType,
       strongestType,
       percentageScore,
     });
+    const recommendation = await predictRecommendation({
+      score: percentageScore,
+      estimatedLevel,
+      unansweredCount,
+      totalQuestions,
+      levelBreakdown,
+      typeBreakdown,
+      weakestType,
+      strongestType,
+    });
+    const breakdown = {
+      levels: LEVEL_ORDER.map((level) => ({
+        level,
+        correct: levelBreakdown[level].correct,
+        total: levelBreakdown[level].total,
+      })),
+      types: TYPE_ORDER.map((type) => ({
+        type: formatTypeLabel(type),
+        correct: typeBreakdown[type].correct,
+        total: typeBreakdown[type].total,
+      })),
+    };
 
     const user = await User.findById(req.session.userId);
 
@@ -458,10 +657,35 @@ router.post("/submit", requireAuth, async (req, res) => {
       title,
       score: percentageScore,
       summary,
+      estimatedLevel,
+      weakestSkill: formatTypeLabel(weakestType),
+      strongestSkill: formatTypeLabel(strongestType),
+      breakdown,
+      recommendation,
       completedAt,
     });
 
     await user.save();
+
+    try {
+      await captureTrainingEvent({
+        user,
+        features: predictionFeatures,
+        score: percentageScore,
+        correctCount,
+        totalQuestions,
+        unansweredCount,
+        estimatedLevel,
+        weakestType,
+        strongestType,
+        recommendation,
+        submittedAutomatically: autoSubmit,
+        capturedAt: completedAt,
+      });
+    } catch (captureError) {
+      console.warn("Unable to capture anonymized training event:", captureError.message);
+    }
+
     req.session.activeTest = null;
     await saveSession(req);
 
@@ -472,24 +696,14 @@ router.post("/submit", requireAuth, async (req, res) => {
         score: percentageScore,
         correctCount,
         totalQuestions,
-        unansweredCount: expectedQuestionIds.filter((questionId) => !answers[questionId]).length,
+        unansweredCount,
         submittedAutomatically: Boolean(autoSubmit),
         estimatedLevel,
         summary,
         weakestSkill: formatTypeLabel(weakestType),
         strongestSkill: formatTypeLabel(strongestType),
-        breakdown: {
-          levels: LEVEL_ORDER.map((level) => ({
-            level,
-            correct: levelBreakdown[level].correct,
-            total: levelBreakdown[level].total,
-          })),
-          types: TYPE_ORDER.map((type) => ({
-            type: formatTypeLabel(type),
-            correct: typeBreakdown[type].correct,
-            total: typeBreakdown[type].total,
-          })),
-        },
+        breakdown,
+        recommendation,
       },
     });
   } catch (error) {

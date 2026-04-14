@@ -6,3 +6,7 @@ backend/cookies.txt
 
 frontend/node_modules
 frontend/dist
+
+ml-service/.venv
+ml-service/__pycache__
+ml-service/data/__pycache__

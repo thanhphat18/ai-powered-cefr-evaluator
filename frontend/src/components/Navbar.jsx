@@ -22,9 +22,14 @@ export default function Navbar(){
                         Home
                     </Link>
                     {user?.role === "admin" ? (
-                        <Link to="/admin" className="navbar-link">
-                            Admin
-                        </Link>
+                        <>
+                            <Link to="/admin" className="navbar-link">
+                                Admin
+                            </Link>
+                            <Link to="/admin/test-bank" className="navbar-link">
+                                Test Bank
+                            </Link>
+                        </>
                     ) : null}
                 </div>
             </div>
