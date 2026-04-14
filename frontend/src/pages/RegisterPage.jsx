@@ -25,8 +25,23 @@ export default function RegisterPage() {
     const { username, email, password } = data;
 
     try {
-      await register({ username, email, password });
-      navigate("/dashboard");
+      const response = await register({ username, email, password });
+
+      if (response.data.user?.role === "admin") {
+        navigate("/dashboard", {
+          replace: true,
+        });
+        return;
+      }
+
+      navigate("/profile", {
+        replace: true,
+        state: {
+          promptAvatarSetup: true,
+          avatarSetupMessage:
+            "Registration successful. Upload an avatar now, or skip and use the default image.",
+        },
+      });
     } catch (err) {
       setError("root.serverError", {
         type: "server",
