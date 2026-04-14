@@ -12,32 +12,9 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
   .split(",")
   .map((email) => email.trim().toLowerCase())
   .filter(Boolean);
-const ALLOW_DEV_RESET_URLS =
-  process.env.ALLOW_DEV_RESET_URLS === "true" ||
-  process.env.NODE_ENV !== "production";
 
 function hashResetToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
-}
-
-function parseBoolean(value) {
-  if (typeof value === "boolean") {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    const normalizedValue = value.trim().toLowerCase();
-
-    if (normalizedValue === "true") {
-      return true;
-    }
-
-    if (normalizedValue === "false") {
-      return false;
-    }
-  }
-
-  return null;
 }
 
 function validateAvatarDataUrl(avatarDataUrl) {
@@ -175,10 +152,6 @@ function serializeUser(user) {
         completedAt: entry.completedAt,
       })),
     },
-    privacy: {
-      trainingDataConsent: Boolean(user.privacy?.trainingDataConsent),
-      trainingDataConsentAt: user.privacy?.trainingDataConsentAt ?? null,
-    },
   };
 }
 
@@ -186,7 +159,6 @@ router.post("/register", async (req, res) => {
   try {
     const { username, email, password } = req.body;
     const normalizedEmail = normalizeEmail(email);
-    const trainingDataConsent = parseBoolean(req.body?.trainingDataConsent);
 
     if (!username || !email || !password) {
       return res.status(400).json({
@@ -207,10 +179,6 @@ router.post("/register", async (req, res) => {
       email: normalizedEmail,
       role: await determineRoleForNewUser(email),
       password,
-      privacy: {
-        trainingDataConsent: Boolean(trainingDataConsent),
-        trainingDataConsentAt: trainingDataConsent ? new Date() : null,
-      },
     });
 
     await user.save();
@@ -303,17 +271,10 @@ router.post("/forgot-password", async (req, res) => {
 
     await user.save();
 
-    const payload = {
+    res.status(200).json({
       ...responseBody,
-    };
-
-    if (ALLOW_DEV_RESET_URLS) {
-      payload.resetUrl = `${
-        process.env.FRONTEND_URL || "http://localhost:5173"
-      }/reset-password/${resetToken}`;
-    }
-
-    res.status(200).json(payload);
+      resetUrl: `${process.env.FRONTEND_URL || "http://localhost:5173"}/reset-password/${resetToken}`,
+    });
   } catch (error) {
     console.error("Forgot password error:", error);
     res.status(500).json({
@@ -386,44 +347,6 @@ router.get("/me", requireAuth, async (req, res) => {
     console.error("Me error:", error);
     res.status(500).json({
       message: "Server error",
-    });
-  }
-});
-
-router.patch("/privacy", requireAuth, async (req, res) => {
-  try {
-    const trainingDataConsent = parseBoolean(req.body?.trainingDataConsent);
-
-    if (trainingDataConsent == null) {
-      return res.status(400).json({
-        message: "trainingDataConsent must be a boolean value",
-      });
-    }
-
-    const user = await User.findById(req.session.userId);
-
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found",
-      });
-    }
-
-    user.privacy = user.privacy || {};
-    user.privacy.trainingDataConsent = trainingDataConsent;
-    user.privacy.trainingDataConsentAt = trainingDataConsent ? new Date() : null;
-
-    await user.save();
-
-    res.status(200).json({
-      message: trainingDataConsent
-        ? "Anonymized training data sharing is enabled"
-        : "Anonymized training data sharing is disabled",
-      user: serializeUser(user),
-    });
-  } catch (error) {
-    console.error("Privacy update error:", error);
-    res.status(500).json({
-      message: "Unable to update privacy settings",
     });
   }
 });

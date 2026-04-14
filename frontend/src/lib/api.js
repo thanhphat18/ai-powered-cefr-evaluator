@@ -1,10 +1,7 @@
 import axios from "axios";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:5001/api";
-
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: "http://localhost:5001/api",
   withCredentials: true,
 });
 
@@ -15,7 +12,6 @@ export const authApi = {
   logout: () => api.post("/auth/logout"),
   me: () => api.get("/auth/me"),
   updateProfile: (payload) => api.patch("/auth/profile", payload),
-  updatePrivacy: (payload) => api.patch("/auth/privacy", payload),
   updateAvatar: (payload) => api.post("/auth/avatar", payload),
   changePassword: (payload) => api.post("/auth/change-password", payload),
   resetPassword: (token, payload) => api.post(`/auth/reset-password/${token}`, payload),

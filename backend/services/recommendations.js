@@ -219,7 +219,6 @@ async function predictRecommendation(context) {
 }
 
 module.exports = {
-  buildPredictionFeatures,
   formatTypeLabel,
   predictRecommendation,
 };

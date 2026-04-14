@@ -73,12 +73,7 @@ export default function ForgotPasswordPage() {
                 {" "}
                 <a href={resetUrl}>{resetUrl}</a>
               </p>
-            ) : (
-              <p>
-                If reset emails are enabled for this deployment, check your inbox
-                and spam folder for the next step.
-              </p>
-            )}
+            ) : null}
           </div>
         ) : null}
 
