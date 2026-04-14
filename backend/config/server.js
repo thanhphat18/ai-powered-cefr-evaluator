@@ -3,10 +3,13 @@ const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const session = require("express-session");
-const { MongoStore } = require("connect-mongo");
+const connectMongo = require("connect-mongo");
 const protectedRoutes = require("../routes/protected");
 const authRoutes = require("../routes/auth");
 const testRoutes = require("../routes/tests");
+
+const MongoStore =
+  connectMongo?.MongoStore || connectMongo?.default || connectMongo;
 
 dotenv.config();
 const app = express();
