@@ -1,4 +1,5 @@
-from typing import Literal
+import os
+from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -29,6 +30,8 @@ class PredictionRequest(BaseModel):
 
 
 MODEL_ARTIFACT = load_artifact()
+ALLOW_MODEL_RELOAD = os.environ.get("ALLOW_MODEL_RELOAD", "").lower() == "true"
+MODEL_RELOAD_TOKEN = os.environ.get("MODEL_RELOAD_TOKEN", "").strip()
 
 app = FastAPI(
     title="CEFR Recommendation Service",
@@ -68,8 +71,20 @@ def predict(payload: PredictionRequest):
 
 
 @app.post("/reload-model")
-def reload_model():
+def reload_model(reload_token: Optional[str] = None):
     global MODEL_ARTIFACT
+
+    if not ALLOW_MODEL_RELOAD:
+        raise HTTPException(
+            status_code=403,
+            detail="Model reload is disabled for this deployment.",
+        )
+
+    if MODEL_RELOAD_TOKEN and reload_token != MODEL_RELOAD_TOKEN:
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid reload token.",
+        )
 
     try:
         MODEL_ARTIFACT = train_and_save_model(force_retrain=True)

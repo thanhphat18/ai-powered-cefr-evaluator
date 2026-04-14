@@ -4,11 +4,7 @@ const User = require("../models/User");
 const TestQuestion = require("../models/TestQuestion");
 const requireAuth = require("../middleware/requireAuth");
 const requireRole = require("../middleware/requireRole");
-const {
-  buildPredictionFeatures,
-  predictRecommendation,
-} = require("../services/recommendations");
-const { captureTrainingEvent } = require("../services/trainingData");
+const { predictRecommendation } = require("../services/recommendations");
 const {
   LEVEL_ORDER,
   TYPE_ORDER,
@@ -592,16 +588,6 @@ router.post("/submit", requireAuth, async (req, res) => {
     const unansweredCount = expectedQuestionIds.filter(
       (questionId) => !answers[questionId]
     ).length;
-    const predictionFeatures = buildPredictionFeatures({
-      score: percentageScore,
-      estimatedLevel,
-      unansweredCount,
-      totalQuestions,
-      levelBreakdown,
-      typeBreakdown,
-      weakestType,
-      strongestType,
-    });
     const summary = buildPerformanceSummary({
       estimatedLevel,
       weakestType,
@@ -666,26 +652,6 @@ router.post("/submit", requireAuth, async (req, res) => {
     });
 
     await user.save();
-
-    try {
-      await captureTrainingEvent({
-        user,
-        features: predictionFeatures,
-        score: percentageScore,
-        correctCount,
-        totalQuestions,
-        unansweredCount,
-        estimatedLevel,
-        weakestType,
-        strongestType,
-        recommendation,
-        submittedAutomatically: autoSubmit,
-        capturedAt: completedAt,
-      });
-    } catch (captureError) {
-      console.warn("Unable to capture anonymized training event:", captureError.message);
-    }
-
     req.session.activeTest = null;
     await saveSession(req);
 

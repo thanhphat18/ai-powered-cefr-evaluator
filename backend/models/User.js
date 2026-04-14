@@ -233,16 +233,6 @@ const userSchema = new mongoose.Schema(
         default: [],
       },
     },
-    privacy: {
-      trainingDataConsent: {
-        type: Boolean,
-        default: false,
-      },
-      trainingDataConsentAt: {
-        type: Date,
-        default: null,
-      },
-    },
     resetPasswordToken: {
       type: String,
       default: null,
