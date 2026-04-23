@@ -14,16 +14,23 @@ const {
 
 const router = express.Router();
 
-const TEST_LEVEL_TARGETS = [
-  { level: "A2", count: 10 },
-  { level: "B1", count: 10 },
-  { level: "B2", count: 10 },
+const CATEGORY_TARGETS = [
+  { type: "meaning", count: 10 },
+  { type: "collocation", count: 10 },
+  { type: "wordform", count: 10 },
 ];
-const TARGET_QUESTION_COUNT = TEST_LEVEL_TARGETS.reduce(
+const TARGET_QUESTION_COUNT = CATEGORY_TARGETS.reduce(
   (sum, target) => sum + target.count,
   0
 );
-const TEST_DURATION_SECONDS = 25 * 60;
+const TEST_DURATION_SECONDS = 30 * 60;
+const SESSION_LEVELS = new Set(LEVEL_ORDER);
+const LEVEL_FALLBACKS = {
+  B1: ["B2", "C1", "C2"],
+  B2: ["C1", "B1", "C2"],
+  C1: ["C2", "B2", "B1"],
+  C2: ["C1", "B2", "B1"],
+};
 
 function shuffle(items) {
   const copy = [...items];
@@ -37,8 +44,8 @@ function shuffle(items) {
 }
 
 function formatTypeLabel(type) {
-  if (type === "word-form") {
-    return "Word Form";
+  if (type === "wordform") {
+    return "Wordform";
   }
 
   return type.charAt(0).toUpperCase() + type.slice(1);
@@ -129,60 +136,132 @@ function saveSession(req) {
   });
 }
 
-function getLevelTargetShortages(questionBank) {
-  return TEST_LEVEL_TARGETS.map((target) => {
-    const available = questionBank.filter(
-      (question) => question.level === target.level
-    ).length;
+function getRequestedSessionLevel(body) {
+  const requestedLevel = body?.selectedLevel ?? body?.level;
 
-    return {
-      level: target.level,
-      required: target.count,
-      available,
-    };
-  }).filter((entry) => entry.available < entry.required);
-}
-
-function buildBalancedQuestionSet(questionBank) {
-  const shortages = getLevelTargetShortages(questionBank);
-
-  if (shortages.length) {
-    return {
-      questions: [],
-      shortages,
-    };
+  if (typeof requestedLevel !== "string") {
+    return "";
   }
 
-  const selectedQuestions = TEST_LEVEL_TARGETS.flatMap((target) =>
-    shuffle(
-      questionBank.filter((question) => question.level === target.level)
-    ).slice(0, target.count)
-  );
+  return requestedLevel.trim().toUpperCase();
+}
 
+function isSessionExpired(activeTest) {
+  if (!activeTest?.startedAt || !activeTest?.durationSeconds) {
+    return false;
+  }
+
+  return (
+    Date.now() - new Date(activeTest.startedAt).getTime() >=
+    activeTest.durationSeconds * 1000
+  );
+}
+
+async function clearActiveSession(req) {
+  req.session.activeTest = null;
+  await saveSession(req);
+}
+
+function buildCompositionSummary(questions) {
   return {
-    questions: shuffle(selectedQuestions),
-    shortages: [],
+    levels: buildCoverage(questions, "level", LEVEL_ORDER),
+    types: buildCoverage(questions, "type", TYPE_ORDER),
   };
 }
 
-function buildUnavailableSession({ questionBank, message, shortages, isEmptyBank }) {
+function selectCategoryQuestions(questionBank, selectedLevel, type, count) {
+  const selectedQuestions = [];
+  const fallbackEntries = [];
+  const levelsToCheck = [selectedLevel, ...LEVEL_FALLBACKS[selectedLevel]];
+
+  for (const level of levelsToCheck) {
+    if (selectedQuestions.length === count) {
+      break;
+    }
+
+    const remaining = count - selectedQuestions.length;
+    const pool = shuffle(
+      questionBank.filter(
+        (question) =>
+          question.level === level &&
+          question.type === type &&
+          !selectedQuestions.some(
+            (selectedQuestion) =>
+              String(selectedQuestion._id) === String(question._id)
+          )
+      )
+    ).slice(0, remaining);
+
+    if (!pool.length) {
+      continue;
+    }
+
+    selectedQuestions.push(...pool);
+
+    if (level !== selectedLevel) {
+      fallbackEntries.push({
+        requestedLevel: selectedLevel,
+        borrowedLevel: level,
+        type,
+        count: pool.length,
+      });
+    }
+  }
+
   return {
-    title: "Question Bank Unavailable",
-    startedAt: null,
-    durationSeconds: TEST_DURATION_SECONDS,
+    questions: selectedQuestions,
+    fallbackEntries,
+    shortage:
+      selectedQuestions.length < count
+        ? {
+            requestedLevel: selectedLevel,
+            type,
+            required: count,
+            available: selectedQuestions.length,
+          }
+        : null,
+  };
+}
+
+function buildSessionQuestionSet(questionBank, selectedLevel) {
+  const categorySelections = CATEGORY_TARGETS.map((target) =>
+    selectCategoryQuestions(
+      questionBank,
+      selectedLevel,
+      target.type,
+      target.count
+    )
+  );
+
+  return {
+    questions: shuffle(categorySelections.flatMap((selection) => selection.questions)),
+    fallbackEntries: categorySelections.flatMap(
+      (selection) => selection.fallbackEntries
+    ),
+    shortages: categorySelections
+      .map((selection) => selection.shortage)
+      .filter(Boolean),
+  };
+}
+
+function buildSessionPayload(activeTest, questions, mode) {
+  const fallbackEntries = activeTest.fallbackUsage || [];
+
+  return {
+    title: activeTest.title,
+    selectedLevel: activeTest.selectedLevel,
+    startedAt: activeTest.startedAt,
+    durationSeconds: activeTest.durationSeconds,
     requestedQuestionCount: TARGET_QUESTION_COUNT,
-    totalQuestions: 0,
-    isSample: false,
-    isEmptyBank,
-    isUnavailable: true,
-    message,
-    missingRequirements: shortages,
-    levelTargets: TEST_LEVEL_TARGETS,
-    coverage: {
-      levels: buildCoverage(questionBank, "level", LEVEL_ORDER),
-      types: buildCoverage(questionBank, "type", TYPE_ORDER),
+    totalQuestions: questions.length,
+    categoryTargets: CATEGORY_TARGETS,
+    mode,
+    compositionSummary: buildCompositionSummary(questions),
+    fallbackUsage: {
+      used: fallbackEntries.length > 0,
+      entries: fallbackEntries,
     },
-    questions: [],
+    questions: questions.map(toPublicQuestion),
   };
 }
 
@@ -392,103 +471,95 @@ router.get("/admin/students", requireRole("admin"), async (req, res) => {
 
 router.get("/session", requireAuth, async (req, res) => {
   try {
+    if (!req.session.activeTest?.questionIds?.length) {
+      return res.status(200).json({
+        session: null,
+      });
+    }
+
+    if (isSessionExpired(req.session.activeTest)) {
+      await clearActiveSession(req);
+
+      return res.status(200).json({
+        session: null,
+      });
+    }
+
+    const activeQuestions = await TestQuestion.find({
+      _id: { $in: req.session.activeTest.questionIds },
+      isActive: true,
+    }).lean();
+    const orderedQuestions = sortQuestionsByIds(
+      activeQuestions,
+      req.session.activeTest.questionIds
+    );
+
+    if (orderedQuestions.length !== req.session.activeTest.questionIds.length) {
+      await clearActiveSession(req);
+
+      return res.status(200).json({
+        session: null,
+      });
+    }
+
+    res.status(200).json({
+      session: buildSessionPayload(req.session.activeTest, orderedQuestions, "resume"),
+    });
+  } catch (error) {
+    console.error("Create test session error:", error);
+    res.status(500).json({
+      message: "Unable to prepare the test session",
+    });
+  }
+});
+
+router.post("/session", requireAuth, async (req, res) => {
+  try {
+    const selectedLevel = getRequestedSessionLevel(req.body);
+
+    if (!selectedLevel || !SESSION_LEVELS.has(selectedLevel)) {
+      return res.status(400).json({
+        message: "The selected level is not supported",
+      });
+    }
+
+    if (req.session.activeTest?.questionIds?.length) {
+      if (!isSessionExpired(req.session.activeTest)) {
+        return res.status(409).json({
+          message: "An active test already exists. Resume the current session first.",
+        });
+      }
+
+      await clearActiveSession(req);
+    }
+
     const questionBank = await TestQuestion.find({ isActive: true }).lean();
-    const expectedQuestionCount = TARGET_QUESTION_COUNT;
-    let selectedQuestions = [];
-    let sessionMode = "new";
-    const sessionExpired =
-      req.session.activeTest?.startedAt &&
-      Date.now() - new Date(req.session.activeTest.startedAt).getTime() >=
-        TEST_DURATION_SECONDS * 1000;
+    const { questions, fallbackEntries, shortages } = buildSessionQuestionSet(
+      questionBank,
+      selectedLevel
+    );
 
-    if (
-      req.session.activeTest?.questionIds?.length === expectedQuestionCount &&
-      !sessionExpired
-    ) {
-      const resumedQuestions = await TestQuestion.find({
-        _id: { $in: req.session.activeTest.questionIds },
-        isActive: true,
-      }).lean();
-
-      selectedQuestions = sortQuestionsByIds(
-        resumedQuestions,
-        req.session.activeTest.questionIds
-      );
-      if (selectedQuestions.length === expectedQuestionCount) {
-        sessionMode = "resume";
-      } else {
-        selectedQuestions = [];
-      }
+    if (shortages.length) {
+      return res.status(409).json({
+        message: `The question bank does not have enough active questions to build a ${selectedLevel} test yet.`,
+        selectedLevel,
+        shortages,
+      });
     }
 
-    if (!selectedQuestions.length) {
-      if (!questionBank.length) {
-        req.session.activeTest = null;
-        await saveSession(req);
-
-        return res.status(200).json({
-          session: buildUnavailableSession({
-            questionBank,
-            message:
-              "No active questions are available in the test bank. Add or activate questions before starting a test.",
-            shortages: TEST_LEVEL_TARGETS.map((target) => ({
-              level: target.level,
-              required: target.count,
-              available: 0,
-            })),
-            isEmptyBank: true,
-          }),
-        });
-      }
-
-      const { questions, shortages } = buildBalancedQuestionSet(questionBank);
-
-      if (shortages.length) {
-        req.session.activeTest = null;
-        await saveSession(req);
-
-        return res.status(200).json({
-          session: buildUnavailableSession({
-            questionBank,
-            message:
-              "The active test bank does not yet meet the balanced 30-question rule. The system needs 10 active A2, 10 active B1, and 10 active B2 questions.",
-            shortages,
-            isEmptyBank: false,
-          }),
-        });
-      }
-
-      selectedQuestions = questions;
-
-      req.session.activeTest = {
-        title: "CEFR Vocabulary Diagnostic • 30 Questions",
-        questionIds: selectedQuestions.map((question) => String(question._id)),
-        startedAt: new Date().toISOString(),
-      };
-      sessionMode = "new";
-    }
+    req.session.activeTest = {
+      title: `${selectedLevel} Vocabulary Test`,
+      selectedLevel,
+      questionIds: questions.map((question) => String(question._id)),
+      startedAt: new Date().toISOString(),
+      durationSeconds: TEST_DURATION_SECONDS,
+      fallbackUsage: fallbackEntries,
+    };
 
     await saveSession(req);
 
-    res.status(200).json({
-      session: {
-        title: req.session.activeTest.title,
-        startedAt: req.session.activeTest.startedAt,
-        durationSeconds: TEST_DURATION_SECONDS,
-        requestedQuestionCount: TARGET_QUESTION_COUNT,
-        totalQuestions: selectedQuestions.length,
-        isSample: false,
-        isEmptyBank: false,
-        isUnavailable: false,
-        missingRequirements: [],
-        levelTargets: TEST_LEVEL_TARGETS,
-        mode: sessionMode,
-        coverage: {
-          levels: buildCoverage(questionBank, "level", LEVEL_ORDER),
-          types: buildCoverage(questionBank, "type", TYPE_ORDER),
-        },
-        questions: selectedQuestions.map(toPublicQuestion),
-      },
+    res.status(201).json({
+      session: buildSessionPayload(req.session.activeTest, questions, "new"),
     });
   } catch (error) {
     console.error("Create test session error:", error);

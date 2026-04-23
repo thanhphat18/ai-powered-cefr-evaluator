@@ -4,9 +4,6 @@ const session = require("express-session");
 const protectedRoutes = require("../routes/protected");
 const authRoutes = require("../routes/auth");
 const testRoutes = require("../routes/tests");
-const requireAuth = require("../middleware/requireAuth");
-
-const SUPPORTED_SESSION_LEVELS = new Set(["B1", "B2", "C1", "C2"]);
 
 function createApp({
   frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173",
@@ -46,36 +43,6 @@ function createApp({
 
   app.get("/health", (req, res) => {
     res.json({ status: "ok" });
-  });
-
-  app.get("/api/tests/session", requireAuth, (req, res, next) => {
-    if (req.session?.activeTest) {
-      return next();
-    }
-
-    return res.status(200).json({
-      session: null,
-    });
-  });
-
-  app.post("/api/tests/session", requireAuth, (req, res, next) => {
-    const requestedLevel = req.body?.selectedLevel ?? req.body?.level;
-
-    if (typeof requestedLevel !== "string") {
-      return next();
-    }
-
-    const normalizedLevel = requestedLevel.trim().toUpperCase();
-
-    if (!normalizedLevel || !SUPPORTED_SESSION_LEVELS.has(normalizedLevel)) {
-      return res.status(400).json({
-        message: "The selected level is not supported",
-      });
-    }
-
-    return res.status(501).json({
-      message: "Level-based test session creation is not implemented yet",
-    });
   });
 
   app.use("/api/auth", authRoutes);
