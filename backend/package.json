@@ -5,7 +5,8 @@
   "main": "config/server.js",
   "scripts": {
     "start": "node config/server.js",
-    "dev": "nodemon config/server.js"
+    "dev": "nodemon config/server.js",
+    "test": "node --test tests/**/*.test.js"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +21,8 @@
     "mongoose": "^8.9.5"
   },
   "devDependencies": {
-    "nodemon": "^3.1.7"
+    "mongodb-memory-server": "^10.4.3",
+    "nodemon": "^3.1.7",
+    "supertest": "^7.2.2"
   }
 }
