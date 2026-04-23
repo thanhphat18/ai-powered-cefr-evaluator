@@ -1,6 +1,7 @@
-const LEVEL_ORDER = ["A1", "A2", "B1", "B2"];
-const TYPE_ORDER = ["meaning", "context", "collocation", "word-form"];
+const LEVEL_ORDER = ["B1", "B2", "C1", "C2"];
+const TYPE_ORDER = ["meaning", "collocation", "wordform"];
 const OPTION_IDS = ["a", "b", "c", "d"];
+const SOURCE_TYPES = ["demo", "manual"];
 
 const CSV_HEADER_ALIASES = {
   level: ["level", "cefrlevel"],
@@ -19,6 +20,8 @@ const CSV_HEADER_ALIASES = {
   ],
   explanation: ["explanation", "note", "notes", "feedback"],
   isActive: ["isactive", "active", "status"],
+  source: ["source"],
+  seedTag: ["seedtag", "seed_tag"],
 };
 
 function normalizeString(value) {
@@ -41,12 +44,13 @@ function normalizeLevel(value) {
 
 function normalizeType(value) {
   const type = normalizeString(value).toLowerCase();
+  const normalizedType = type.replace(/[\s_-]+/g, "");
 
-  if (!TYPE_ORDER.includes(type)) {
+  if (!TYPE_ORDER.includes(normalizedType)) {
     throw new Error(`Type must be one of: ${TYPE_ORDER.join(", ")}`);
   }
 
-  return type;
+  return normalizedType;
 }
 
 function normalizeCorrectOptionId(value) {
@@ -83,6 +87,25 @@ function normalizeBoolean(value, defaultValue = true) {
   }
 
   throw new Error("Active status must be true/false or active/inactive");
+}
+
+function normalizeSource(value) {
+  const source = normalizeString(value).toLowerCase();
+
+  if (!source) {
+    return undefined;
+  }
+
+  if (!SOURCE_TYPES.includes(source)) {
+    throw new Error(`Source must be one of: ${SOURCE_TYPES.join(", ")}`);
+  }
+
+  return source;
+}
+
+function normalizeSeedTag(value) {
+  const seedTag = normalizeString(value);
+  return seedTag;
 }
 
 function normalizeOptions(options) {
@@ -131,6 +154,8 @@ function normalizeQuestionInput(input = {}) {
     correctOptionId: normalizeCorrectOptionId(input.correctOptionId),
     explanation: normalizeString(input.explanation),
     isActive: normalizeBoolean(input.isActive, true),
+    source: normalizeSource(input.source),
+    seedTag: normalizeSeedTag(input.seedTag),
   };
 }
 
@@ -260,6 +285,8 @@ function buildQuestionFromCsvRow(row, headerIndexes) {
         : normalizedStatus === "active"
         ? true
         : statusValue,
+    source: readValue("source"),
+    seedTag: readValue("seedTag"),
   });
 }
 

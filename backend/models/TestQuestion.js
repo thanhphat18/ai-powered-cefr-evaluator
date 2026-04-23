@@ -23,12 +23,12 @@ const testQuestionSchema = new mongoose.Schema(
     level: {
       type: String,
       required: true,
-      enum: ["A1", "A2", "B1", "B2"],
+      enum: ["B1", "B2", "C1", "C2"],
     },
     type: {
       type: String,
       required: true,
-      enum: ["meaning", "context", "collocation", "word-form"],
+      enum: ["meaning", "collocation", "wordform"],
     },
     prompt: {
       type: String,
@@ -68,6 +68,17 @@ const testQuestionSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    source: {
+      type: String,
+      enum: ["demo", "manual"],
+      default: "manual",
+      trim: true,
+    },
+    seedTag: {
+      type: String,
+      default: "",
+      trim: true,
     },
   },
   {
