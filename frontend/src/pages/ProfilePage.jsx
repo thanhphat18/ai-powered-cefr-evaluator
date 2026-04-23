@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
@@ -47,6 +47,20 @@ function readFileAsDataUrl(file) {
 
     reader.readAsDataURL(file);
   });
+}
+
+function getCategoryBreakdown(entry) {
+  if (!Array.isArray(entry?.breakdown?.types)) {
+    return [];
+  }
+
+  return entry.breakdown.types.filter(
+    (item) =>
+      item &&
+      typeof item.type === "string" &&
+      typeof item.correct === "number" &&
+      typeof item.total === "number"
+  );
 }
 
 function AdminProfileContent({ user, refreshUser }) {
@@ -479,8 +493,8 @@ function StudentProfileContent({ user, refreshUser }) {
           <p className="eyebrow">Private Space</p>
           <h1>Profile</h1>
           <p className="profile-subtitle">
-            This page keeps the personal account information for the logged-in user
-            and leaves room for their future test performance history.
+            This page keeps your account details in one place and stores each
+            completed vocabulary test with its saved level and category breakdown.
           </p>
 
           {showAvatarPrompt ? (
@@ -685,9 +699,8 @@ function StudentProfileContent({ user, refreshUser }) {
           </div>
 
           <p className="profile-note">
-            These values are ready for the test module later, so each completed
-            test can update the user profile and leave a saved summary in the
-            private library.
+            Each completed session adds a saved result here, so you can compare
+            levels, scores, and the three category breakdowns over time.
           </p>
         </article>
       </section>
@@ -702,9 +715,34 @@ function StudentProfileContent({ user, refreshUser }) {
                   <h2>{entry.title}</h2>
                   <span className="profile-library-score">Score: {entry.score ?? 0}</span>
                 </div>
+                <div className="profile-library-chip-row profile-library-meta-row">
+                  <span className="profile-library-technique">
+                    Level: {entry.selectedLevel || "Unknown"}
+                  </span>
+                  {entry.estimatedLevel ? (
+                    <span className="profile-library-technique">
+                      Estimated: {entry.estimatedLevel}
+                    </span>
+                  ) : null}
+                </div>
                 <p className="profile-library-summary">
                   {entry.summary || "A generated summary for this test will appear here."}
                 </p>
+                {getCategoryBreakdown(entry).length ? (
+                  <div className="profile-library-breakdown">
+                    <p className="profile-library-label">Category breakdown</p>
+                    <div className="profile-library-chip-row">
+                      {getCategoryBreakdown(entry).map((item) => (
+                        <span
+                          className="profile-library-technique"
+                          key={`${entry.id}-${item.type}`}
+                        >
+                          {item.type} {item.correct}/{item.total}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 {entry.recommendation?.title ? (
                   <div className="profile-library-recommendation">
                     <p className="profile-library-label">Recommended next step</p>
@@ -735,8 +773,8 @@ function StudentProfileContent({ user, refreshUser }) {
           <div className="profile-empty-state">
             <h2>No test summaries stored yet</h2>
             <p>
-              After a user completes a test, this area can work like a private
-              library that keeps their result summary, score, and completion date.
+              After you complete a test, this private library stores the score,
+              selected level, category breakdown, and recommendation for later review.
             </p>
           </div>
         )}

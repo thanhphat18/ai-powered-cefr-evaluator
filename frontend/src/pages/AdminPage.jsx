@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { testsApi } from "../lib/api";
 
+const SESSION_LEVELS = ["B1", "B2", "C1", "C2"];
+
 function formatCompletedAt(value) {
   if (!value) {
     return "No activity yet";
@@ -76,7 +78,7 @@ export default function AdminPage() {
 
   const questionStats = useMemo(() => {
     const activeCount = questions.filter((question) => question.isActive).length;
-    const levelCounts = ["A2", "B1", "B2"].map((level) => ({
+    const levelCounts = SESSION_LEVELS.map((level) => ({
       level,
       count: questions.filter(
         (question) => question.isActive && question.level === level
@@ -151,8 +153,8 @@ export default function AdminPage() {
           <div className="dashboard-action-panel">
             <p className="dashboard-panel-label">Quick actions</p>
             <p className="dashboard-panel-copy">
-              Jump to the dedicated test-bank page, preview the current test flow,
-              or open your admin profile.
+              Jump to the dedicated test-bank page, preview the current student
+              flow, or open your admin profile.
             </p>
 
             <div className="dashboard-action-row">
@@ -166,7 +168,7 @@ export default function AdminPage() {
               <button
                 type="button"
                 className="dashboard-secondary-button"
-                onClick={() => navigate("/test")}
+                onClick={() => navigate("/test/start")}
               >
                 Preview Test
               </button>
@@ -208,12 +210,12 @@ export default function AdminPage() {
               </p>
             </div>
             <div className="dashboard-stat">
-              <span className="dashboard-stat-label">Balanced Test Ready</span>
+              <span className="dashboard-stat-label">All Levels Seeded</span>
               <strong className="dashboard-stat-value">
                 {questionStats.readyForBalancedTest ? "Yes" : "No"}
               </strong>
               <p className="dashboard-stat-copy">
-                Requires at least 10 active questions in A2, B1, and B2.
+                Checks whether each session level has at least 10 active demo questions.
               </p>
             </div>
             <div className="dashboard-stat">
@@ -248,8 +250,9 @@ export default function AdminPage() {
           </div>
 
           <p className="dashboard-section-copy">
-            Each test now uses exactly 30 questions, selected randomly with a fixed
-            balance of 10 A2, 10 B1, and 10 B2 questions.
+            Each test now uses exactly 30 questions: 10 meaning, 10 collocation,
+            and 10 wordform items generated from the selected B1 to C2 level, with
+            fallback fill from nearby levels only when needed.
           </p>
 
           <div className="dashboard-stat-grid admin-stat-grid">
@@ -259,7 +262,7 @@ export default function AdminPage() {
                 <strong className="dashboard-stat-value">{entry.count}</strong>
                 <p className="dashboard-stat-copy">
                   {entry.count >= 10
-                    ? "Enough questions for the current test rule."
+                    ? "Enough active questions to support fallback-aware session generation."
                     : `Need ${10 - entry.count} more active question${
                         10 - entry.count === 1 ? "" : "s"
                       }.`}

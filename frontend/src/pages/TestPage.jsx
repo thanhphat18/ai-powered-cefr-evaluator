@@ -1,18 +1,19 @@
-import { useEffect, useEffectEvent, useState } from "react";
+import React, { useEffect, useEffectEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { testsApi } from "../lib/api";
 import { useAuth } from "../context/useAuth";
 import { formatTypeLabel } from "../lib/testBank";
 
 const EMPTY_QUESTIONS = [];
+const START_REDIRECT_DELAY_MS = 900;
 
-function formatLevelTargets(levelTargets) {
-  if (!Array.isArray(levelTargets) || !levelTargets.length) {
-    return "10 A2, 10 B1, and 10 B2";
+function formatCategoryTargets(categoryTargets) {
+  if (!Array.isArray(categoryTargets) || !categoryTargets.length) {
+    return "10 meaning, 10 collocation, and 10 wordform questions";
   }
 
-  return levelTargets
-    .map((target) => `${target.count} ${target.level}`)
+  return categoryTargets
+    .map((target) => `${target.count} ${formatTypeLabel(target.type).toLowerCase()}`)
     .join(", ");
 }
 
@@ -32,9 +33,17 @@ function formatCountdown(totalSeconds) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function getVisibleComposition(entries, key) {
+  if (!Array.isArray(entries)) {
+    return [];
+  }
+
+  return entries.filter((entry) => entry && entry[key] && entry.count > 0);
+}
+
 export default function TestPage() {
   const navigate = useNavigate();
-  const { user, refreshUser } = useAuth();
+  const { refreshUser } = useAuth();
   const [session, setSession] = useState(null);
   const [answers, setAnswers] = useState({});
   const [activeIndex, setActiveIndex] = useState(0);
@@ -43,25 +52,35 @@ export default function TestPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [secondsRemaining, setSecondsRemaining] = useState(null);
+  const [redirectingToStart, setRedirectingToStart] = useState(false);
 
   useEffect(() => {
     let isCancelled = false;
 
     const loadSession = async () => {
       try {
-        const response = await testsApi.startSession();
+        const response = await testsApi.getSession();
 
         if (isCancelled) {
           return;
         }
 
+        if (!response.data.session) {
+          setSession(null);
+          setRedirectingToStart(true);
+          setError("");
+          return;
+        }
+
         setSession(response.data.session);
+        setRedirectingToStart(false);
         setError("");
       } catch (err) {
         if (isCancelled) {
           return;
         }
 
+        setRedirectingToStart(false);
         setError(err.response?.data?.message || "Unable to load the test right now");
       } finally {
         if (!isCancelled) {
@@ -76,6 +95,20 @@ export default function TestPage() {
       isCancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (loading || !redirectingToStart) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      navigate("/test/start", { replace: true });
+    }, START_REDIRECT_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [loading, navigate, redirectingToStart]);
 
   const questions = session?.questions ?? EMPTY_QUESTIONS;
   const currentQuestion = questions[activeIndex];
@@ -207,6 +240,7 @@ export default function TestPage() {
   useEffect(() => {
     if (
       loading ||
+      redirectingToStart ||
       result ||
       isSubmitting ||
       !questions.length ||
@@ -216,7 +250,15 @@ export default function TestPage() {
     }
 
     handleTimedSubmit();
-  }, [isSubmitting, loading, questions.length, result, secondsRemaining]);
+  }, [
+    handleTimedSubmit,
+    isSubmitting,
+    loading,
+    questions.length,
+    redirectingToStart,
+    result,
+    secondsRemaining,
+  ]);
 
   const handleAnswerSelect = (questionId, optionId) => {
     setAnswers((current) => ({
@@ -231,10 +273,34 @@ export default function TestPage() {
       <main className="test-page">
         <section className="test-card">
           <p className="eyebrow">Test Workspace</p>
-          <h1>Preparing your diagnostic</h1>
+          <h1>Preparing your session</h1>
           <p className="test-copy">
-            Loading question data from the test bank so the session can begin.
+            Checking whether you already have an active level-based test in progress.
           </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (redirectingToStart) {
+    return (
+      <main className="test-page">
+        <section className="test-card">
+          <p className="eyebrow">Start Test</p>
+          <h1>Redirecting to Start Test</h1>
+          <p className="test-copy">
+            There is no active test session yet, so the app is sending you to the
+            level picker now.
+          </p>
+          <div className="test-action-row">
+            <button
+              type="button"
+              className="dashboard-primary-button"
+              onClick={() => navigate("/test/start", { replace: true })}
+            >
+              Choose a level now
+            </button>
+          </div>
         </section>
       </main>
     );
@@ -253,6 +319,10 @@ export default function TestPage() {
               <div className="test-metric-card">
                 <span className="test-metric-label">Score</span>
                 <strong className="test-metric-value">{result.score}%</strong>
+              </div>
+              <div className="test-metric-card">
+                <span className="test-metric-label">Selected Level</span>
+                <strong className="test-metric-value">{result.selectedLevel}</strong>
               </div>
               <div className="test-metric-card">
                 <span className="test-metric-label">Estimated CEFR</span>
@@ -300,9 +370,9 @@ export default function TestPage() {
                   Focus: {result.recommendation.focusSkill}
                 </span>
                 <span className="test-chip">
-                  {result.recommendation.source === "ml-service"
-                    ? "ML-guided recommendation"
-                    : "Rule-guided recommendation"}
+                  {result.recommendation.source === "local-rules"
+                    ? "Local recommendation"
+                    : "Saved recommendation"}
                 </span>
               </div>
 
@@ -347,11 +417,11 @@ export default function TestPage() {
             <p className="eyebrow">Breakdown</p>
             <div className="test-breakdown-grid">
               <div className="test-breakdown-block">
-                <h2>By Level</h2>
+                <h2>By Category</h2>
                 <div className="test-breakdown-list">
-                  {result.breakdown.levels.map((entry) => (
-                    <div className="test-breakdown-item" key={entry.level}>
-                      <span>{entry.level}</span>
+                  {(result.breakdown?.types || []).map((entry) => (
+                    <div className="test-breakdown-item" key={entry.type}>
+                      <span>{entry.type}</span>
                       <strong>
                         {entry.correct}/{entry.total}
                       </strong>
@@ -361,11 +431,11 @@ export default function TestPage() {
               </div>
 
               <div className="test-breakdown-block">
-                <h2>By Skill</h2>
+                <h2>Question Sources</h2>
                 <div className="test-breakdown-list">
-                  {result.breakdown.types.map((entry) => (
-                    <div className="test-breakdown-item" key={entry.type}>
-                      <span>{entry.type}</span>
+                  {(result.breakdown?.levels || []).map((entry) => (
+                    <div className="test-breakdown-item" key={entry.level}>
+                      <span>{entry.level}</span>
                       <strong>
                         {entry.correct}/{entry.total}
                       </strong>
@@ -380,46 +450,41 @@ export default function TestPage() {
     );
   }
 
-  if (!session || session.isUnavailable || !currentQuestion) {
-    const unavailableMessage = session?.message
-      ? session.message
-      : session?.isEmptyBank
-      ? user?.role === "admin"
-        ? "No active questions are available. Add questions manually or import them from CSV in the test-bank manager before starting a test."
-        : "No active questions are available right now. Please ask your administrator to add or activate test-bank questions."
-      : error || "The test session could not be prepared.";
-
+  if (!session || !currentQuestion) {
     return (
       <main className="test-page">
         <section className="test-card">
           <p className="eyebrow">Test Workspace</p>
           <h1>Test unavailable</h1>
-          <p className="test-copy">{unavailableMessage}</p>
-          {session?.missingRequirements?.length ? (
-            <div className="test-coverage-block">
-              <h3>Missing coverage</h3>
-              <div className="test-chip-list">
-                {session.missingRequirements.map((entry) => (
-                  <span className="test-chip" key={entry.level}>
-                    {entry.level}: {entry.available}/{entry.required}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          <button
-            type="button"
-            className="dashboard-secondary-button"
-            onClick={() =>
-              navigate(user?.role === "admin" ? "/admin/test-bank" : "/dashboard")
-            }
-          >
-            {user?.role === "admin" ? "Open Test Bank Manager" : "Return to Dashboard"}
-          </button>
+          <p className="test-copy">
+            {error || "The active session could not be restored from the question bank."}
+          </p>
+          <div className="test-action-row">
+            <button
+              type="button"
+              className="dashboard-primary-button"
+              onClick={() => navigate("/test/start")}
+            >
+              Start a new test
+            </button>
+            <button
+              type="button"
+              className="dashboard-secondary-button"
+              onClick={() => navigate("/dashboard")}
+            >
+              Return to Dashboard
+            </button>
+          </div>
         </section>
       </main>
     );
   }
+
+  const visibleTypeMix = getVisibleComposition(session.compositionSummary?.types, "type");
+  const visibleLevelMix = getVisibleComposition(
+    session.compositionSummary?.levels,
+    "level"
+  );
 
   return (
     <main className="test-page">
@@ -427,13 +492,13 @@ export default function TestPage() {
         <aside className="test-card test-sidebar">
           <p className="eyebrow">Session Overview</p>
           <h2>{session.title}</h2>
-            <p className="test-copy">
-              {session.mode === "resume"
-                ? "An unfinished session was found, so the page restored the same question set for you."
-                : `This session uses ${session.requestedQuestionCount} randomly selected questions with a fixed balance of ${formatLevelTargets(
-                    session.levelTargets
-                  )}.`}
-            </p>
+          <p className="test-copy">
+            {session.mode === "resume"
+              ? `An unfinished ${session.selectedLevel} session was found, so the page restored the same question set for you.`
+              : `This ${session.selectedLevel} demo session uses ${session.totalQuestions} random questions built from ${formatCategoryTargets(
+                  session.categoryTargets
+                )}.`}
+          </p>
 
           <div className="test-progress-card">
             <span className="test-metric-label">Completion</span>
@@ -449,27 +514,48 @@ export default function TestPage() {
               {formatCountdown(secondsRemaining ?? session.durationSeconds ?? 0)}
             </strong>
             <p className="test-copy">
-              The test auto-submits at 25 minutes even if some questions are blank.
+              The timer runs for 30 minutes and auto-submits when it expires.
             </p>
           </div>
 
           <div className="test-coverage-block">
-            <h3>Bank coverage</h3>
+            <h3>Session Mix</h3>
             <div className="test-chip-list">
-              {session.coverage.levels.map((entry) => (
-                <span className="test-chip" key={entry.value}>
-                  {entry.value}: {entry.count}
+              <span className="test-chip">Selected level: {session.selectedLevel}</span>
+              {visibleTypeMix.map((entry) => (
+                <span className="test-chip" key={entry.type}>
+                  {formatTypeLabel(entry.type)}: {entry.count}
                 </span>
               ))}
             </div>
-            <div className="test-chip-list">
-              {session.coverage.types.map((entry) => (
-                <span className="test-chip" key={entry.value}>
-                  {formatTypeLabel(entry.value)}: {entry.count}
-                </span>
-              ))}
-            </div>
+
+            {visibleLevelMix.length ? (
+              <div className="test-chip-list">
+                {visibleLevelMix.map((entry) => (
+                  <span className="test-chip" key={entry.level}>
+                    Source {entry.level}: {entry.count}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
+
+          {session.fallbackUsage?.used ? (
+            <div className="test-coverage-block">
+              <h3>Fallback Fill</h3>
+              <div className="test-chip-list">
+                {session.fallbackUsage.entries.map((entry, index) => (
+                  <span
+                    className="test-chip"
+                    key={`${entry.borrowedLevel}-${entry.type}-${index}`}
+                  >
+                    {entry.count} {formatTypeLabel(entry.type).toLowerCase()} from{" "}
+                    {entry.borrowedLevel}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="test-index-grid">
             {questions.map((question, index) => (
@@ -492,6 +578,10 @@ export default function TestPage() {
             <div className="test-question-head">
               <div>
                 <p className="eyebrow">Question {activeIndex + 1}</p>
+                <div className="test-question-tags">
+                  <span className="test-chip">{currentQuestion.level}</span>
+                  <span className="test-chip">{formatTypeLabel(currentQuestion.type)}</span>
+                </div>
                 <p className="test-question-prompt">{currentQuestion.prompt}</p>
               </div>
             </div>
@@ -555,19 +645,19 @@ export default function TestPage() {
 
           <article className="test-card test-guidance-card">
             <p className="eyebrow">Coach Notes</p>
-            <h2>How this first version works</h2>
+            <h2>How this demo flow works</h2>
             <div className="dashboard-checklist">
               <p className="dashboard-check-item">
-                Questions are drawn from the active MongoDB test bank using the
-                fixed 30-question rule: 10 A2, 10 B1, and 10 B2.
+                Students begin at the level picker, choose B1 through C2, and then
+                enter a timed 30-question session.
               </p>
               <p className="dashboard-check-item">
-                When you submit, the score is stored in your user summary so the
-                dashboard and profile can reuse it.
+                Each session targets 10 meaning, 10 collocation, and 10 wordform
+                questions pulled randomly from the current bank.
               </p>
               <p className="dashboard-check-item">
-                This page is intentionally minimal now, so we can shape timing,
-                navigation, and anti-cheating rules after your next round of answers.
+                Results are saved to the dashboard and profile with category
+                breakdowns plus a local recommendation for the next study block.
               </p>
             </div>
           </article>
