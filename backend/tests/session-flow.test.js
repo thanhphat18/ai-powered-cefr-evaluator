@@ -33,12 +33,22 @@ test("GET /api/tests/session returns session: null when there is no active test"
   });
 });
 
-test("POST /api/tests/session rejects unsupported selected levels", async () => {
+test("POST /api/tests/session rejects unsupported selected level", async () => {
   const agent = await createAuthenticatedAgent(app);
   const response = await agent.post("/api/tests/session").send({
-    selectedLevels: ["C1"],
+    selectedLevel: "A2",
   });
 
   assert.equal(response.status, 400);
   assert.match(response.body.message, /selected level/i);
+});
+
+test("POST /api/tests/session does not fall through for supported future levels yet", async () => {
+  const agent = await createAuthenticatedAgent(app);
+  const response = await agent.post("/api/tests/session").send({
+    selectedLevel: "C1",
+  });
+
+  assert.equal(response.status, 501);
+  assert.match(response.body.message, /not implemented/i);
 });

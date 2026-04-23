@@ -6,7 +6,7 @@ const authRoutes = require("../routes/auth");
 const testRoutes = require("../routes/tests");
 const requireAuth = require("../middleware/requireAuth");
 
-const SUPPORTED_SESSION_LEVELS = new Set(["A2", "B1", "B2"]);
+const SUPPORTED_SESSION_LEVELS = new Set(["B1", "B2", "C1", "C2"]);
 
 function createApp({
   frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173",
@@ -59,27 +59,23 @@ function createApp({
   });
 
   app.post("/api/tests/session", requireAuth, (req, res, next) => {
-    const selectedLevels = req.body?.selectedLevels;
+    const requestedLevel = req.body?.selectedLevel ?? req.body?.level;
 
-    if (!Array.isArray(selectedLevels)) {
+    if (typeof requestedLevel !== "string") {
       return next();
     }
 
-    const normalizedLevels = selectedLevels
-      .map((level) => String(level).trim().toUpperCase())
-      .filter(Boolean);
+    const normalizedLevel = requestedLevel.trim().toUpperCase();
 
-    const hasUnsupportedLevel =
-      !normalizedLevels.length ||
-      normalizedLevels.some((level) => !SUPPORTED_SESSION_LEVELS.has(level));
-
-    if (hasUnsupportedLevel) {
+    if (!normalizedLevel || !SUPPORTED_SESSION_LEVELS.has(normalizedLevel)) {
       return res.status(400).json({
-        message: "One or more selected levels are not supported",
+        message: "The selected level is not supported",
       });
     }
 
-    return next();
+    return res.status(501).json({
+      message: "Level-based test session creation is not implemented yet",
+    });
   });
 
   app.use("/api/auth", authRoutes);
