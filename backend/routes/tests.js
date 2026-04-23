@@ -266,7 +266,7 @@ function buildSessionPayload(activeTest, questions, mode) {
 }
 
 function deriveEstimatedLevel(levelBreakdown, percentageScore) {
-  let estimatedLevel = "A1";
+  let estimatedLevel = LEVEL_ORDER[0];
 
   for (const level of LEVEL_ORDER) {
     const bucket = levelBreakdown[level];
@@ -280,15 +280,11 @@ function deriveEstimatedLevel(levelBreakdown, percentageScore) {
     }
   }
 
-  if (percentageScore >= 85) {
-    return "B2";
-  }
-
   return estimatedLevel;
 }
 
 function buildPerformanceSummary({
-  estimatedLevel,
+  selectedLevel,
   weakestType,
   strongestType,
   percentageScore,
@@ -296,7 +292,7 @@ function buildPerformanceSummary({
   const weakestLabel = formatTypeLabel(weakestType);
   const strongestLabel = formatTypeLabel(strongestType);
 
-  return `Estimated CEFR level: ${estimatedLevel}. Strongest skill: ${strongestLabel}. Weakest skill: ${weakestLabel}. Focus next on ${weakestLabel.toLowerCase()} questions to improve accuracy after scoring ${percentageScore} percent on this diagnostic.`;
+  return `You completed the ${selectedLevel} vocabulary test with ${percentageScore} percent accuracy. Strongest skill: ${strongestLabel}. Weakest skill: ${weakestLabel}. Focus next on ${weakestLabel.toLowerCase()} questions before your next session.`;
 }
 
 router.get("/bank", requireRole("admin"), async (req, res) => {
@@ -634,6 +630,7 @@ router.post("/submit", requireAuth, async (req, res) => {
 
     const totalQuestions = orderedQuestions.length;
     const percentageScore = Math.round((correctCount / totalQuestions) * 100);
+    const selectedLevel = req.session.activeTest.selectedLevel || LEVEL_ORDER[0];
     const estimatedLevel = deriveEstimatedLevel(levelBreakdown, percentageScore);
 
     const rankedTypes = TYPE_ORDER
@@ -660,18 +657,14 @@ router.post("/submit", requireAuth, async (req, res) => {
       (questionId) => !answers[questionId]
     ).length;
     const summary = buildPerformanceSummary({
-      estimatedLevel,
+      selectedLevel,
       weakestType,
       strongestType,
       percentageScore,
     });
     const recommendation = await predictRecommendation({
       score: percentageScore,
-      estimatedLevel,
-      unansweredCount,
-      totalQuestions,
-      levelBreakdown,
-      typeBreakdown,
+      selectedLevel,
       weakestType,
       strongestType,
     });
@@ -697,7 +690,7 @@ router.post("/submit", requireAuth, async (req, res) => {
     }
 
     const completedAt = new Date();
-    const title = `${estimatedLevel} Diagnostic • ${completedAt.toLocaleDateString(
+    const title = `${selectedLevel} Vocabulary Test • ${completedAt.toLocaleDateString(
       "en-US",
       {
         year: "numeric",
@@ -712,6 +705,7 @@ router.post("/submit", requireAuth, async (req, res) => {
     user.summary.testLibrary = user.summary.testLibrary || [];
     user.summary.testLibrary.unshift({
       title,
+      selectedLevel,
       score: percentageScore,
       summary,
       estimatedLevel,
@@ -730,6 +724,7 @@ router.post("/submit", requireAuth, async (req, res) => {
       message: "Test submitted successfully",
       result: {
         title,
+        selectedLevel,
         score: percentageScore,
         correctCount,
         totalQuestions,

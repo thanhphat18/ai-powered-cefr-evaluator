@@ -140,6 +140,11 @@ const testLibraryItemSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    selectedLevel: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     score: {
       type: Number,
       default: 0,

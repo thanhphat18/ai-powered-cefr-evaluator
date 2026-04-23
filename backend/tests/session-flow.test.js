@@ -125,3 +125,38 @@ test("POST /api/tests/session fills category shortages from nearby levels and re
     )
   );
 });
+
+test("POST /api/tests/submit stores selected level and category breakdowns in the user summary", async () => {
+  const agent = await createAuthenticatedAgent(app);
+  await seedDemoQuestionBank();
+
+  const created = await agent.post("/api/tests/session").send({
+    selectedLevel: "B1",
+  });
+
+  assert.equal(created.status, 201);
+
+  const answers = Object.fromEntries(
+    created.body.session.questions.map((question) => [question.id, "a"])
+  );
+
+  const submit = await agent.post("/api/tests/submit").send({
+    answers,
+    autoSubmit: false,
+  });
+
+  assert.equal(submit.status, 200);
+  assert.equal(submit.body.result.selectedLevel, "B1");
+  assert.equal(submit.body.result.breakdown.types.length, 3);
+  assert.equal(submit.body.result.recommendation.source, "local-rules");
+
+  const me = await agent.get("/api/auth/me");
+
+  assert.equal(me.status, 200);
+  assert.equal(me.body.user.summary.testLibrary[0].selectedLevel, "B1");
+  assert.equal(me.body.user.summary.testLibrary[0].breakdown.types.length, 3);
+  assert.equal(
+    me.body.user.summary.testLibrary[0].recommendation.source,
+    "local-rules"
+  );
+});

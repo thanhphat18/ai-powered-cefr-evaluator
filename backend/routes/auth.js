@@ -131,6 +131,7 @@ function serializeUser(user) {
       testLibrary: (user.summary?.testLibrary ?? []).map((entry) => ({
         id: entry._id,
         title: entry.title,
+        selectedLevel: entry.selectedLevel ?? "",
         score: entry.score ?? 0,
         summary: entry.summary ?? "",
         estimatedLevel: entry.estimatedLevel ?? "",
