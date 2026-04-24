@@ -97,7 +97,7 @@ export default function ManageTestBankPage() {
 
   const questionStats = useMemo(() => {
     const activeCount = questions.filter((question) => question.isActive).length;
-    const balancedCounts = ["A2", "B1", "B2"].map((level) => ({
+    const balancedCounts = QUESTION_LEVELS.map((level) => ({
       level,
       count: questions.filter(
         (question) => question.isActive && question.level === level

@@ -1,3 +1,4 @@
+import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { DEFAULT_AVATAR_URL } from "../lib/avatar";
 import { useAuth } from "../context/useAuth";

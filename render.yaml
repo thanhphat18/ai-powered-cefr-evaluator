@@ -37,25 +37,5 @@ services:
         value: "true"
       - key: SESSION_COOKIE_SAME_SITE
         value: none
-      - key: RECOMMENDATION_SERVICE_URL
-        sync: false
-      - key: RECOMMENDATION_REQUEST_TIMEOUT_MS
-        value: "6000"
-      - key: TRAINING_DATA_SALT
-        generateValue: true
       - key: ALLOW_DEV_RESET_URLS
         value: "false"
-
-  - type: web
-    name: cefr-evaluator-ml
-    runtime: python
-    plan: free
-    rootDir: ml-service
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /health
-    envVars:
-      - key: ALLOW_MODEL_RELOAD
-        value: "false"
-      - key: MODEL_RELOAD_TOKEN
-        generateValue: true

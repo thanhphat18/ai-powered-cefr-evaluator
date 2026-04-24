@@ -1129,6 +1129,25 @@ h1 {
   gap: 1.25rem;
 }
 
+.test-level-page,
+.test-level-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.test-level-hero,
+.test-level-card {
+  gap: 1rem;
+}
+
+.test-level-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.test-level-card {
+  min-height: 100%;
+}
+
 .test-main-column,
 .test-result-layout {
   display: flex;
@@ -1732,6 +1751,16 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
+}
+
+.profile-library-meta-row,
+.profile-library-breakdown {
+  margin-top: 0.85rem;
+}
+
+.profile-library-breakdown {
+  display: grid;
+  gap: 0.7rem;
 }
 
 .profile-library-technique {

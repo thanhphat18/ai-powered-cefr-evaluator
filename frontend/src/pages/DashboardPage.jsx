@@ -1,8 +1,9 @@
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import AdminPage from "./AdminPage";
 
-const QUESTION_TYPES = ["Meaning", "Context", "Collocation", "Word Form", "Mixed"];
+const QUESTION_TYPES = ["Meaning", "Collocation", "Wordform"];
 
 function formatCompletedAt(value) {
   if (!value) {
@@ -35,34 +36,34 @@ function getLevelEstimate(score) {
   if (typeof score !== "number" || score <= 0) {
     return {
       label: "Pending",
-      detail: "Complete one diagnostic to estimate a CEFR band.",
+      detail: "Complete one level-based test to estimate your current CEFR band.",
     };
   }
 
-  if (score <= 22) {
-    return {
-      label: "A1",
-      detail: "Build word recognition and high-frequency meaning patterns.",
-    };
-  }
-
-  if (score <= 45) {
-    return {
-      label: "A2",
-      detail: "Strengthen sentence-level vocabulary choices and short context clues.",
-    };
-  }
-
-  if (score <= 67) {
+  if (score <= 39) {
     return {
       label: "B1",
-      detail: "Focus on flexible vocabulary use across collocations and context.",
+      detail: "Build control over core meaning questions and more dependable word choices.",
+    };
+  }
+
+  if (score <= 64) {
+    return {
+      label: "B2",
+      detail: "Strengthen natural collocations and more flexible vocabulary use.",
+    };
+  }
+
+  if (score <= 84) {
+    return {
+      label: "C1",
+      detail: "Refine precision, word family control, and nuanced lexical choices.",
     };
   }
 
   return {
-    label: "B2",
-    detail: "Refine precision, nuance, and more natural lexical choices.",
+    label: "C2",
+    detail: "Maintain high accuracy across meaning, collocation, and advanced wordform control.",
   };
 }
 
@@ -88,18 +89,13 @@ function inferFocusArea(testLibrary) {
       detail: "Review core definitions and compare near-synonyms before the next test.",
     },
     {
-      label: "Context",
-      regex: /(context|sentence use|sentence clue|usage)/i,
-      detail: "Practice reading the full sentence before selecting the most natural option.",
-    },
-    {
       label: "Collocation",
       regex: /(collocation|natural phrase|word partner|phrase choice)/i,
       detail: "Train with common word partnerships and short phrase completion drills.",
     },
     {
-      label: "Word Form",
-      regex: /(word form|prefix|suffix|grammar form|derivation)/i,
+      label: "Wordform",
+      regex: /(wordform|word form|prefix|suffix|grammar form|derivation|affix)/i,
       detail: "Target affixes and part-of-speech shifts inside sentence patterns.",
     },
   ];
@@ -124,11 +120,11 @@ function getCoachPlan({
   if (!testsTaken || !latestTest) {
     return {
       status: "Coach setup",
-      title: "Start one full diagnostic to unlock your coaching loop.",
+      title: "Start one level-based test to unlock your coaching loop.",
       summary:
         "Your dashboard is ready to become a study guide, but it needs one completed test before it can estimate your CEFR level and surface a priority skill.",
       actions: [
-        "Take the full CEFR diagnostic in one focused sitting.",
+        "Choose B1, B2, C1, or C2 before you enter the timed session.",
         "Review the saved result summary right after submission.",
         "Return here to get a short, targeted next-step plan.",
       ],
@@ -214,28 +210,29 @@ export default function DashboardPage() {
               <span className="welcome-name">{user?.username || user?.email}</span>.
               {user?.role === "admin"
                 ? " You can manage the question bank and still use the student test flow from the same workspace."
-                : " This workspace keeps your CEFR progress concise, clear, and ready for the next study decision."}
+                : " This workspace keeps each level-based vocabulary result concise, clear, and ready for the next study decision."}
             </p>
 
             <div className="dashboard-pill-row">
-              <span className="dashboard-pill">90-question diagnostic</span>
-              <span className="dashboard-pill">A1-B2 coverage</span>
-              <span className="dashboard-pill">AI-guided next step</span>
+              <span className="dashboard-pill">30 questions</span>
+              <span className="dashboard-pill">30 minutes</span>
+              <span className="dashboard-pill">B1-C2 demo bank</span>
+              <span className="dashboard-pill">Category breakdown saved</span>
             </div>
           </div>
 
           <div className="dashboard-action-panel">
             <p className="dashboard-panel-label">Next session</p>
             <p className="dashboard-panel-copy">
-              Start the diagnostic when your test route is ready, then use the saved
-              summary here to plan the next practice block.
+              Start from the level picker, complete one timed 30-question session,
+              then use the saved breakdown here to plan the next practice block.
             </p>
 
             <div className="dashboard-action-row">
               <button
                 type="button"
                 className="dashboard-primary-button"
-                onClick={() => navigate("/test")}
+                onClick={() => navigate("/test/start")}
               >
                 Start Test
               </button>
@@ -316,7 +313,7 @@ export default function DashboardPage() {
             <h2>{focusArea?.label || "Skill breakdown pending"}</h2>
             <p className="dashboard-section-copy">
               {focusArea?.detail ||
-                "Once your test engine stores skill-level results, this card can highlight the true weakest area instead of relying on broad summary text."}
+                "Once you complete a test, this card highlights the weakest saved category from your latest breakdown."}
             </p>
 
             <div className="dashboard-skill-row">
@@ -366,8 +363,8 @@ export default function DashboardPage() {
               <div className="dashboard-empty-state">
                 <h2>No saved results yet</h2>
                 <p>
-                  Complete your first diagnostic to unlock the AI coach summary, CEFR
-                  estimate, and recent test history.
+                  Complete your first level-based test to unlock the coach summary,
+                  CEFR estimate, and recent test history.
                 </p>
               </div>
             )}

@@ -1,13 +1,8 @@
-export const QUESTION_LEVELS = ["A1", "A2", "B1", "B2"];
-export const QUESTION_TYPES = [
-  "meaning",
-  "context",
-  "collocation",
-  "word-form",
-];
+export const QUESTION_LEVELS = ["B1", "B2", "C1", "C2"];
+export const QUESTION_TYPES = ["meaning", "collocation", "wordform"];
 
 export const EMPTY_QUESTION_FORM = {
-  level: "A1",
+  level: "B1",
   type: "meaning",
   prompt: "",
   optionA: "",
@@ -34,34 +29,46 @@ const CSV_TEMPLATE_HEADERS = [
 
 const CSV_TEMPLATE_ROWS = [
   [
-    "A1",
+    "B1",
     "meaning",
-    'Choose the word closest in meaning to "big".',
-    "small",
-    "large",
-    "slow",
-    "thin",
+    'Choose the word closest in meaning to "careful".',
+    "careless",
+    "cautious",
+    "sudden",
+    "crowded",
     "b",
-    '"Large" has nearly the same meaning as "big".',
+    '"Cautious" is the closest synonym to "careful".',
     "true",
   ],
   [
-    "B1",
+    "C1",
     "collocation",
-    'Choose the most natural collocation: "make ____".',
-    "a decision",
-    "a homework",
-    "an advice",
+    'Choose the most natural collocation: "pose ____".',
+    "a challenge",
     "a progress",
+    "a reaction",
+    "a possibility",
     "a",
-    'English uses "make a decision".',
+    'English most naturally uses "pose a challenge".',
+    "true",
+  ],
+  [
+    "C2",
+    "wordform",
+    'Choose the correct form: "The committee questioned the ____ of the proposal."',
+    "viable",
+    "viability",
+    "vitalize",
+    "vividly",
+    "b",
+    '"Viability" is the noun that fits after "the".',
     "true",
   ],
 ];
 
 export function formatTypeLabel(type) {
-  if (type === "word-form") {
-    return "Word Form";
+  if (type === "word-form" || type === "wordform") {
+    return "Wordform";
   }
 
   return type.charAt(0).toUpperCase() + type.slice(1);

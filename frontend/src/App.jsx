@@ -1,3 +1,4 @@
+import React from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import DashboardPage from "./pages/DashboardPage";
@@ -8,6 +9,7 @@ import ManageTestBankPage from "./pages/ManageTestBankPage";
 import ProfilePage from "./pages/ProfilePage";
 import RegisterPage from "./pages/RegisterPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import TestLevelPage from "./pages/TestLevelPage";
 import TestPage from "./pages/TestPage";
 import Navbar from "./components/Navbar";
 
@@ -48,6 +50,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/test/start"
+          element={
+            <ProtectedRoute>
+              <TestLevelPage />
             </ProtectedRoute>
           }
         />

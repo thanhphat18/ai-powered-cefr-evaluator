@@ -21,7 +21,8 @@ export const authApi = {
 };
 
 export const testsApi = {
-  startSession: () => api.get("/tests/session"),
+  getSession: () => api.get("/tests/session"),
+  createSession: (payload) => api.post("/tests/session", payload),
   submitSession: (payload) => api.post("/tests/submit", payload),
   getBank: () => api.get("/tests/bank"),
   getStudents: () => api.get("/tests/admin/students"),
